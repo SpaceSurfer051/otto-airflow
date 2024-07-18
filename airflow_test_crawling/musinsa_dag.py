@@ -1,51 +1,25 @@
-
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from datetime import datetime, timedelta
-import subprocess
+from airflow.utils.dates import days_ago
+from code_test.airflow_product_review import read_s3_and_compare_links
 
 default_args = {
     'owner': 'airflow',
-    'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
-    'email_on_failure': False,
-    'email_on_retry': False,
+    'start_date': days_ago(1),
     'retries': 1,
-    'retry_delay': timedelta(minutes=5),
 }
 
 dag = DAG(
-    'data_crawling_and_processing',
+    'crawl_dag',
     default_args=default_args,
-    description='A simple data crawling and processing workflow',
-    schedule_interval=timedelta(days=1),
+    description='DAG to crawl and compare links',
+    schedule_interval=None,
 )
 
-def run_review_product_data_crawling():
-    subprocess.run(["python", "/path/to/airflow_product_review.py"], check=True)
-
-def run_color_size_crawling():
-    subprocess.run(["python", "/path/to/airflow_size_color.py"], check=True)
-
-def run_test2():
-    subprocess.run(["python", "/path/to/airflow_data_preprocessing.py"], check=True)
-
-t1 = PythonOperator(
-    task_id='review_product_data_crawling',
-    python_callable=run_review_product_data_crawling,
+crawl_task = PythonOperator(
+    task_id='read_s3_and_compare_links',
+    python_callable=read_s3_and_compare_links,
     dag=dag,
 )
 
-t2 = PythonOperator(
-    task_id='color_size_crawling',
-    python_callable=run_color_size_crawling,
-    dag=dag,
-)
-
-t3 = PythonOperator(
-    task_id='data_processing_and_loading',
-    python_callable=run_test2,
-    dag=dag,
-)
-
-t1 >> t2 >> t3
+crawl_task
