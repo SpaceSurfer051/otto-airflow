@@ -154,7 +154,9 @@ def get_product_info(driver, wait, href_links):
                 "image_url": image_url,
                 "description": description,
                 "size": sizes,
-                "reviews": reviews
+                "reviews": reviews,
+                "size_options": [],  # 빈 값으로 채움
+                "color_options": []  # 빈 값으로 채움
             }
             products.append(product)
             
@@ -168,16 +170,16 @@ def get_product_info(driver, wait, href_links):
 
     return products
 
-def save_to_csv(products, filename="products.csv"):
+def save_to_csv(products, filename="products_with_size_color.csv"):
     df = pd.DataFrame(products)
-    df.to_csv(filename, index=False, encoding='utf-8-sig')
+    df.to_csv(filename, index=False, encoding='utf-8')
     print(f"Data saved to {filename}")
 
 def read_s3_and_compare_links():
     # S3에서 CSV 파일 읽기
     s3_hook = S3Hook(aws_conn_id='aws_s3')
     bucket_name = 'papalio-test-bucket'
-    key = 'test_otto/products.csv'
+    key = 'test_otto/products_with_size_color.csv'
 
     s3_client = s3_hook.get_conn()
     obj = s3_client.get_object(Bucket=bucket_name, Key=key)
@@ -211,7 +213,21 @@ def read_s3_and_compare_links():
     if not new_links:
         print("No new links found.")
         return
+    new_links_df = pd.DataFrame(new_links, columns=['description'])
+    new_links_csv = StringIO()
+    new_links_df.to_csv(new_links_csv, index=False, encoding='utf-8')
 
+    s3_hook = S3Hook(aws_conn_id='aws_s3')
+    s3_client = s3_hook.get_conn()
+    bucket_name = 'papalio-test-bucket'
+    new_links_key = 'test_otto/new_links.csv'
+
+    s3_client.put_object(Bucket=bucket_name, Key=new_links_key, Body=new_links_csv.getvalue())
+    
+    
+    print("New links saved to S3")
+    
+    
     # 새로운 링크의 정보 수집
     driver = webdriver.Remote(command_executor=remote_webdriver, options=options)
     wait = WebDriverWait(driver, 10)
@@ -224,7 +240,7 @@ def read_s3_and_compare_links():
 
     # CSV 파일에 업데이트된 데이터 저장
     updated_csv = StringIO()
-    updated_df.to_csv(updated_csv, index=False, encoding='utf-8-sig')
+    updated_df.to_csv(updated_csv, index=False, encoding='utf-8')
 
     # 업데이트된 CSV를 S3에 업로드
     s3_client.put_object(Bucket=bucket_name, Key=key, Body=updated_csv.getvalue())
