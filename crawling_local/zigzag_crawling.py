@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementNotInteractableException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
@@ -82,6 +82,42 @@ def get_color_tag_list(wait):
     return color_table.find_elements(By.TAG_NAME, 'li')
 
 
+def color_crawling(driver):
+    color_string_tag = {'색상', 'color'}
+
+    color_set = set()
+    wait = WebDriverWait(driver, 3)
+    buy_button = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'BODY_17.BOLD.css-hbld7k.e1yh52zv0')))
+    ActionChains(driver).click(buy_button).perform()
+    toggle_tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'BODY_15.SEMIBOLD.css-utqis4.e1cn5bmz0')))
+    tag_string = toggle_tag.text.lower()
+    tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+    if tag_string in color_string_tag:
+        for color_tag in tag_list:
+            time.sleep(0.1)
+            color = color_tag.text.split('\n')[0]
+            color_set.add(color)
+    else:
+        for i in range(len(tag_list)):
+            time.sleep(0.1)
+            tag = tag_list[i]
+            time.sleep(1)
+            tag.click()
+            color_tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+            driver.implicitly_wait(1)
+            for color_tag in color_tag_list:
+                time.sleep(0.1)
+                color = color_tag.text.split('\n')[0]
+                color_set.add(color)
+            tag_button = driver.find_element(By.CLASS_NAME, 'css-oa28ah.e1u2d7n06')
+            tag_button.click()
+            time.sleep(1)
+            tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+            driver.implicitly_wait(1)
+
+    return list(color_set)
+
+
 def size_crawling(driver, url):
     button_tags = driver.find_elements(By.CLASS_NAME, 'BODY_16.SEMIBOLD.css-1qe1foo.e1wqfudt0')
     if len(button_tags) < 4:
@@ -107,14 +143,21 @@ def product_crawling(driver, category, product_list):
         driver.get(url)
         wait = WebDriverWait(driver, 3)
         temp['product_id'] = product_id
+        temp['category'] = category
         temp['product_url'] = url
         temp['name'] = crawling_product_name(wait)
         temp['price'] = crawling_product_price(wait)
         temp['img_url'] = crawling_product_img_url(wait)
 
-        size = size_crawling(driver, url)
-        temp['size'] = size
-        temp['category'] = category
+        temp['size'] = size_crawling(driver, url)
+        try:
+            temp['color'] = color_crawling(driver)
+        except NoSuchElementException as e:
+            print(f'error at product id (NSEE) :: {product_id}')
+            continue
+        except ElementNotInteractableException as e:
+            print(f'error at product id (ENIE) :: {product_id}')
+            continue
 
         product_info[product_id] = temp
         time.sleep(2)
@@ -219,7 +262,7 @@ def get_product_id(driver, url, max_num=10):
 def main():
     category_ids = {
         '상의' : '474',
-        # '하의' : '547'
+        '하의' : '547'
     }
     ## 리뷰순으로 정렬된 url
     products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
@@ -228,26 +271,27 @@ def main():
     reviews = {}
 
     options = Options()
-    options.add_argument("--headless")
+    options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
     with webdriver.Chrome(\
         service=Service(ChromeDriverManager().install(),\
         options=options\
     )) as driver:
         for category, id in category_ids.items():
             url = products_url.format(id=id)
-            product_list = get_product_id(driver, url, 3)
-            # product_info_list = product_crawling(driver, category, product_list)
-            review_list = review_crawling(driver, product_list, 5)
+            product_list = get_product_id(driver, url, 100)
+            product_info_list = product_crawling(driver, category, product_list)
+            review_list = review_crawling(driver, product_list, 20)
 
-            # product_infos.update(product_info_list)
+            product_infos.update(product_info_list)
             reviews.update(review_list)
 
-    # print(product_infos)
-    print(reviews)
-    # pd_product_infos = pd.DataFrame(product_infos).T
+    pd_product_infos = pd.DataFrame(product_infos).T
     pd_reviews = pd.DataFrame(reviews).T
 
-    # pd_product_infos.to_csv("zigzag_product_infos.csv", encoding='utf-8-sig', index=True)
+    pd_product_infos.to_csv("zigzag_product_infos.csv", encoding='utf-8-sig', index=True)
     pd_reviews.to_csv("zigzag_reviews.csv", encoding='utf-8-sig', index=True)
 
 
@@ -296,6 +340,13 @@ def test():
         #     print(product)
         #     print(len(review))
         #     print(review)
+
+        # ## 색상 잘 불러오는 지 테스트
+        # for link in ['https://zigzag.kr/catalog/products/132082569', 'https://zigzag.kr/catalog/products/122210777', 'https://zigzag.kr/catalog/products/112059662']:
+        #     driver.get(link)
+        #     colors = color_crawling(driver)
+        #     print(colors)
+
 
 
 if __name__ == '__main__':
