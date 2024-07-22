@@ -83,7 +83,7 @@ def get_color_tag_list(wait):
 
 
 def color_crawling(driver):
-    color_string_tag = {'색상', 'color'}
+    color_string_tag = {'색상', 'color', '컬러'}
 
     color_set = set()
     wait = WebDriverWait(driver, 3)
@@ -154,10 +154,10 @@ def product_crawling(driver, category, product_list):
             temp['color'] = color_crawling(driver)
         except NoSuchElementException as e:
             print(f'error at product id (NSEE) :: {product_id}')
-            continue
+            temp['color'] = None
         except ElementNotInteractableException as e:
             print(f'error at product id (ENIE) :: {product_id}')
-            continue
+            temp['color'] = None
 
         product_info[product_id] = temp
         time.sleep(2)
