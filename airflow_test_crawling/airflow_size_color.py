@@ -6,6 +6,7 @@ import time
 from airflow.hooks.S3_hook import S3Hook
 from io import StringIO
 from selenium.webdriver.chrome.options import Options
+import sys
 
 def get_li_texts(driver, xpath):
     ul_element = driver.find_element(By.XPATH, xpath)
@@ -115,8 +116,16 @@ def read_s3_and_add_size_color():
     df_new_list = pd.read_csv(StringIO(obj2['Body'].read().decode('utf-8')))
     description_list = df_new_list['description'].tolist()
 
-    size_options, color_options = visit_websites(description_list)
-    for i, desc in enumerate(description_list):
+    # 이미 존재하는 링크 확인
+    existing_descriptions = df['description'].tolist()
+    new_descriptions = [desc for desc in description_list if desc not in existing_descriptions]
+
+    if not new_descriptions:
+        print("No new links to process. Task will be terminated.")
+        sys.exit(0)
+
+    size_options, color_options = visit_websites(new_descriptions)
+    for i, desc in enumerate(new_descriptions):
         df.loc[df['description'] == desc, 'size_options'] = [size_options[i]]
         df.loc[df['description'] == desc, 'color_options'] = [color_options[i]]
 
