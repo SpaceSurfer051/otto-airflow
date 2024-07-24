@@ -40,7 +40,7 @@ def get_driver():
 
 def get_csv_from_s3(bucket_name, key):
     try:
-        s3_hook = S3Hook(aws_conn_id='s3_aws')
+        s3_hook = S3Hook(aws_conn_id='aws_s3')
 
         s3_client = s3_hook.get_conn()
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
@@ -57,7 +57,7 @@ def get_csv_from_s3(bucket_name, key):
 def save_df_to_s3(df, bucket_name, key):
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
-    s3_hook = S3Hook(aws_conn_id='s3_aws')
+    s3_hook = S3Hook(aws_conn_id='aws_s3')
     s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
 
 
@@ -67,8 +67,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         'top' : '474',
         'bottom' : '547'
     }
-    product_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_product_infos.csv')
-    review_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_reviews.csv')
+    product_df = get_csv_from_s3(bucket_name, 'non-integrated-data/zigzag_products.csv')
+    review_df = get_csv_from_s3(bucket_name, 'non-integrated-data/zigzag_reviews.csv')
     link_set = set(product_df['product_url'])
     logging.info(f'origin link\'s length ==> {len(link_set)}')
     
@@ -94,8 +94,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         logging.info('done.')
         logging.info(f'length:: {len(review_df)}')
 
-    save_df_to_s3(product_df, bucket_name, 'zigzag/zigzag_product_infos_updated.csv')
-    save_df_to_s3(review_df, bucket_name, 'zigzag/zigzag_reviews_updated.csv')
+    save_df_to_s3(product_df, bucket_name, 'non-integrated-data/zigzag_products_updated.csv')
+    save_df_to_s3(review_df, bucket_name, 'non-integrated-data/zigzag_reviews_updated.csv')
 
     driver.quit()
     
@@ -117,13 +117,13 @@ dag = DAG(
     tags=['update_dag'],
 )
 
-download_task = PythonOperator(
+update_task = PythonOperator(
     task_id='update_crawling_data',
     python_callable=update_crawling_data,
     op_kwargs={
-        'bucket_name': 'otto-default'
+        'bucket_name': 'otto-glue'
     },
     dag=dag,
 )
 
-download_task
+update_task
