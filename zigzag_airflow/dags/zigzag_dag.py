@@ -44,7 +44,7 @@ def get_csv_from_s3(bucket_name, key):
 
         s3_client = s3_hook.get_conn()
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')))
+        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8-sig')))
         logging.info(f'successfully get csv file from {key}')
         logging.info(f'loaded csv length ::: {len(df)}')
 
@@ -56,7 +56,7 @@ def get_csv_from_s3(bucket_name, key):
 
 def save_df_to_s3(df, bucket_name, key):
     csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False)
+    df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
     s3_hook = S3Hook(aws_conn_id='s3_aws')
     s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
 
