@@ -69,8 +69,7 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     }
     product_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_product_infos.csv')
     review_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_reviews.csv')
-    # link_set = set(product_df['product_url'])
-    link_set = set()
+    link_set = set(product_df['product_url'])
     logging.info(f'origin link\'s length ==> {len(link_set)}')
     
     driver = get_driver()
