@@ -104,7 +104,7 @@ def get_product_info(driver, wait, href_links):
         time.sleep(2)
 
         try:
-            product_id = f"top{index + 1}"
+            product_id = "none"
             
             try:
                 product_name = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="root"]/div[3]/h2'))).text

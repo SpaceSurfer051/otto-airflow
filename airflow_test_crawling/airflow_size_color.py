@@ -19,7 +19,7 @@ def visit_website(urls):
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-
+ 
     remote_webdriver = 'http://remote_chromedriver:4444/wd/hub'
     size_options = []
     color_options = []
