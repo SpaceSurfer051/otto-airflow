@@ -3,7 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementNotInteractableException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementNotInteractableException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
@@ -12,6 +12,8 @@ from selenium.webdriver import ActionChains
 from datetime import datetime
 import time
 import pandas as pd
+
+import logging
 
 def create_log(msg):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -42,7 +44,7 @@ def crawling_product_name(wait):
         time.sleep(0.5)
         return tag.text
     except TimeoutException as e:
-        print(f"exception at `crawling_product_name` => {e}")
+        logging.info(f"exception at `crawling_product_name` => {e}")
         return
 
 
@@ -57,7 +59,7 @@ def crawling_product_price(wait):
             time.sleep(0.5)
             return tag.text
         except TimeoutException as e:
-            print(f"exception at `crawling_product_price` => {e}")
+            logging.info(f"exception at `crawling_product_price` => {e}")
             return
 
 
@@ -70,10 +72,10 @@ def crawling_product_img_url(wait):
         try:
             div = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'swiper-slide.swiper-slide-active')))
             src = div.find_element(By.XPATH, './/div/div/picture/img').get_attribute('src')
-            print("crawled from first exception")
+            logging.info("crawled from first exception")
             return src
         except TimeoutException as e:
-            print(f"exception at crawling_product_img_url` => {e}")
+            logging.info(f"exception at crawling_product_img_url` => {e}")
             return
 
 
@@ -129,35 +131,35 @@ def size_crawling(driver, url):
         size_tag_list = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'head.CAPTION_11.SEMIBOLD.css-oyuqpv.eqs9ftl0')))
         return list(map(lambda tag: tag.text, size_tag_list))
     except:
-        return None
+        return 'none'
 
 
 def product_crawling(driver, category, product_list):
-    print(create_log('start product crawling'))
+    logging.info('start product crawling')
     product_url = 'https://zigzag.kr/catalog/products/{product_id}'
     product_info = {}
     for product_id in product_list:
-        print(create_log(product_id))
+        logging.info(product_id)
         temp = {}
         url = product_url.format(product_id=product_id)
         driver.get(url)
         wait = WebDriverWait(driver, 3)
         temp['product_id'] = product_id
         temp['category'] = category
-        temp['product_url'] = url
-        temp['name'] = crawling_product_name(wait)
+        temp['description'] = url
+        temp['product_name'] = crawling_product_name(wait)
         temp['price'] = crawling_product_price(wait)
-        temp['img_url'] = crawling_product_img_url(wait)
+        temp['image_url'] = crawling_product_img_url(wait)
 
         temp['size'] = size_crawling(driver, url)
         try:
             temp['color'] = color_crawling(driver)
         except NoSuchElementException as e:
-            print(f'error at product id (NSEE) :: {product_id}')
-            temp['color'] = None
+            logging.info(f'error at product id (NSEE) :: {product_id}')
+            temp['color'] = 'none'
         except ElementNotInteractableException as e:
-            print(f'error at product id (ENIE) :: {product_id}')
-            temp['color'] = None
+            logging.info(f'error at product id (ENIE) :: {product_id}')
+            temp['color'] = 'none'
 
         product_info[product_id] = temp
         time.sleep(2)
@@ -165,14 +167,14 @@ def product_crawling(driver, category, product_list):
     return product_info
 
 
-def review_crawling(driver, product_list, max_num=10):
-    print(create_log('start review crawling'))
+def review_crawling(driver, product_list, max_num=10, category='top'):
+    logging.info('start review crawling')
     review_url = 'https://zigzag.kr/review/list/{product_id}'
     xpath = '/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]'
     reviews = {}
 
     for product_id in product_list:
-        print(create_log(product_id))
+        logging.info(product_id)
         url = review_url.format(product_id=product_id)
         driver.get(url)
         wait = WebDriverWait(driver, 3)
@@ -185,7 +187,7 @@ def review_crawling(driver, product_list, max_num=10):
             try:
                 review_tag = wait.until(EC.presence_of_element_located((By.XPATH, x)))
             except TimeoutException as ee:
-                print('no more review')
+                logging.info('no more review')
                 break
             
             time.sleep(1)
@@ -198,41 +200,41 @@ def review_crawling(driver, product_list, max_num=10):
 
             height = get_or_none(review_tag, './/div/div[3]/span/span[1]')
             weight = get_or_none(review_tag, './/div/div[3]/span/span[2]')
-            top_size = get_or_none(review_tag, './/div/div[3]/span/span[3]')
+            size = get_or_none(review_tag, './/div/div[3]/span/span[3]')
 
             detail_text = get_or_none(review_tag, 'BODY_14.REGULAR.css-epr5m6.e1j2jqj72', by=By.CLASS_NAME)
             review_id = f'{product_id}_{i}'
 
-            print(review_id)
+            logging.info(review_id)
 
             temp = {
                 'review_id': review_id,
                 'product_id': product_id,
-                'selected_color': selected_color,
-                'selected_size': selected_size,
-                'size_opinion': size_opinion,
-                'quality_opinion': quality_opinion,
-                'color_opinion': color_opinion,
+                'color': selected_color,
+                'size': selected_size,
+                'size_comment': size_opinion,
+                'quality_comment': quality_opinion,
+                'color_comment': color_opinion,
+                f'{category}_size': size,
                 'height': height,
                 'weight': weight,
-                'top_size': top_size,
-                'detail_text': detail_text
+                'comment': detail_text
             }
             reviews[review_id] = temp
-            
     
     return reviews
 
 
-def get_product_id(driver, url, max_num=10):
+def get_product_id(driver, url, max_num=10, link_set=set()):
     id_set = set()
     id_list = []
     driver.get(url)
     action = ActionChains(driver)
-    driver.implicitly_wait(1)
+    driver.implicitly_wait(10)
     time.sleep(1)
 
     for i in range(max_num):
+        time.sleep(1)
         if len(id_list) > max_num:
             break
         try:
@@ -245,24 +247,33 @@ def get_product_id(driver, url, max_num=10):
             for div in raw:
                 a = div.find_element(By.XPATH, './/div/a')
                 href = a.get_attribute('href')
+                time.sleep(0.1)
                 product_id = href.split('/')[-1]
-                if product_id not in id_set:
-                    id_list.append(product_id)
-                    id_set.add(product_id)
-                time.sleep(0.5)
+                logging.info(product_id)
+                if href not in link_set:
+                    if product_id not in id_set:
+                        id_list.append(product_id)
+                        id_set.add(product_id)
+                    time.sleep(0.5)
+                else:
+                    logging.info(f'product id ({product_id}) is crawled already')
             time.sleep(0.5)
 
         except NoSuchElementException as e:
-            print("No more products")
+            logging.info("No more products")
             break
+
+        except WebDriverException as e:
+            logging.info("Java TimeoutException")
+            continue
 
     return id_list
 
 
 def main():
     category_ids = {
-        '상의' : '474',
-        '하의' : '547'
+        'top' : '474',
+        'bottom' : '547'
     }
     ## 리뷰순으로 정렬된 url
     products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
@@ -281,15 +292,16 @@ def main():
     )) as driver:
         for category, id in category_ids.items():
             url = products_url.format(id=id)
-            product_list = get_product_id(driver, url, 100)
+            product_list = get_product_id(driver, url, 10)
             product_info_list = product_crawling(driver, category, product_list)
-            review_list = review_crawling(driver, product_list, 20)
+            review_list = review_crawling(driver, product_list, 5, category=category)
 
             product_infos.update(product_info_list)
             reviews.update(review_list)
 
     pd_product_infos = pd.DataFrame(product_infos).T
     pd_reviews = pd.DataFrame(reviews).T
+    pd_reviews['product_name'] = pd_product_infos['product_name']
 
     pd_product_infos.to_csv("zigzag_product_infos.csv", encoding='utf-8-sig', index=True)
     pd_reviews.to_csv("zigzag_reviews.csv", encoding='utf-8-sig', index=True)
@@ -314,7 +326,7 @@ def test():
         #     url = products_url.format(id=id)
             
         #     # ## 제품 아이디 불러오는 거 확인
-        #     link = get_product_id(driver, url, max_num=1)
+        #     link = get_product_id(driver, url, max_num=30)
         #     print(f'loaded {len(link)} from {category}')
         #     all_links.extend(link)
         # print(f'total links => {len(all_links)}')

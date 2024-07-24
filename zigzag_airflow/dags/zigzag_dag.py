@@ -39,15 +39,26 @@ def get_driver():
 
 
 def get_csv_from_s3(bucket_name, key):
+    try:
+        s3_hook = S3Hook(aws_conn_id='s3_aws')
+
+        s3_client = s3_hook.get_conn()
+        obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')))
+        logging.info(f'successfully get csv file from {key}')
+        logging.info(f'loaded csv length ::: {len(df)}')
+
+        return df
+    except Exception as e:
+        logging.info(e)
+        return pd.DataFrame()
+
+
+def save_df_to_s3(df, bucket_name, key):
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer, index=False)
     s3_hook = S3Hook(aws_conn_id='s3_aws')
-
-    s3_client = s3_hook.get_conn()
-    obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-    df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8')))
-    logging.info(f'successfully get csv file from {key}')
-    logging.info(f'loaded csv length ::: {len(df)}')
-
-    return df
+    s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
 
 
 def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
@@ -58,7 +69,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     }
     product_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_product_infos.csv')
     review_df = get_csv_from_s3(bucket_name, 'zigzag/zigzag_reviews.csv')
-    link_set = set(product_df['product_url'])
+    # link_set = set(product_df['product_url'])
+    link_set = set()
     logging.info(f'origin link\'s length ==> {len(link_set)}')
     
     driver = get_driver()
@@ -77,11 +89,14 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         logging.info(f'length:: {len(product_df)}')
 
         logging.info(f'start {category} review crawling')
-        review_list = review_crawling(driver, product_list, review_max_num)
+        review_list = review_crawling(driver, product_list, review_max_num, category=category)
         review_list_df = pd.DataFrame(review_list).T
         review_df = pd.concat([review_df, review_list_df], ignore_index=True)
         logging.info('done.')
         logging.info(f'length:: {len(review_df)}')
+
+    save_df_to_s3(product_df, bucket_name, 'zigzag/zigzag_product_infos_updated.csv')
+    save_df_to_s3(review_df, bucket_name, 'zigzag/zigzag_reviews_updated.csv')
 
     driver.quit()
     
