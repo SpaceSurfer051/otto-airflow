@@ -85,8 +85,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         logging.info('done.')
         logging.info(f'length:: {len(review_df)}')
 
-    save_df_to_s3(product_df, bucket_name, 'non-integrated-data/zigzag_products_updated.csv')
-    save_df_to_s3(review_df, bucket_name, 'non-integrated-data/zigzag_reviews_updated.csv')
+    save_df_to_s3(product_df, bucket_name, 'non-integrated-data/zigzag_products.csv')
+    save_df_to_s3(review_df, bucket_name, 'non-integrated-data/zigzag_reviews.csv')
 
     driver.quit()
     
