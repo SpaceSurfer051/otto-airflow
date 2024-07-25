@@ -13,31 +13,31 @@ import pandas as pd
 import logging
 
 from io import StringIO
-  
+
 
 def get_driver():
-    logging.info('creating driver.')
+    logging.info("creating driver.")
     options = Options()
     options.add_experimental_option("excludeSwitches", ["enable-logging"])
-    options.add_argument('--headless')  # GUI를 표시하지 않음
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    
-    remote_webdriver = 'http://remote_chromedriver:4444/wd/hub'
+    options.add_argument("--headless")  # GUI를 표시하지 않음
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    remote_webdriver = "http://remote_chromedriver:4444/wd/hub"
     driver = webdriver.Remote(command_executor=remote_webdriver, options=options)
-    logging.info('driver created.')
+    logging.info("driver created.")
     return driver
 
 
 def get_csv_from_s3(bucket_name, key):
     try:
-        s3_hook = S3Hook(aws_conn_id='aws_s3')
+        s3_hook = S3Hook(aws_conn_id="aws_s3")
 
         s3_client = s3_hook.get_conn()
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
-        df = pd.read_csv(StringIO(obj['Body'].read().decode('utf-8-sig')))
-        logging.info(f'successfully get csv file from {key}')
-        logging.info(f'loaded csv length ::: {len(df)}')
+        df = pd.read_csv(StringIO(obj["Body"].read().decode("utf-8-sig")))
+        logging.info(f"successfully get csv file from {key}")
+        logging.info(f"loaded csv length ::: {len(df)}")
 
         return df
     except Exception as e:
@@ -47,81 +47,83 @@ def get_csv_from_s3(bucket_name, key):
 
 def save_df_to_s3(df, bucket_name, key):
     csv_buffer = StringIO()
-    df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
-    s3_hook = S3Hook(aws_conn_id='aws_s3')
+    df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
+    s3_hook = S3Hook(aws_conn_id="aws_s3")
     s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
 
 
 def set_rank(df, sorted_product_list):
-    df['rank'] = 'none'
-    rank_dict = {product_id: rank + 1 for rank, product_id in enumerate(sorted_product_list)}
-    df['rank'] = df['product_id'].map(rank_dict).fillna('none')
-    
+    df["rank"] = "none"
+    rank_dict = {
+        product_id: rank + 1 for rank, product_id in enumerate(sorted_product_list)
+    }
+    df["rank"] = df["product_id"].map(rank_dict).fillna("none")
+
     return df
 
+
 def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
-    products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
-    category_ids = {
-        'top' : '474',
-        'bottom' : '547'
-    }
-    product_df = get_csv_from_s3(bucket_name, 'non-integrated-data/zigzag_products.csv')
-    review_df = get_csv_from_s3(bucket_name, 'non-integrated-data/zigzag_reviews.csv')
-    link_set = set(product_df['product_url'])
-    logging.info(f'origin link\'s length ==> {len(link_set)}')
-    
+    products_url = "https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201"
+    category_ids = {"top": "474", "bottom": "547"}
+    product_df = get_csv_from_s3(bucket_name, "non-integrated-data/zigzag_products.csv")
+    review_df = get_csv_from_s3(bucket_name, "non-integrated-data/zigzag_reviews.csv")
+    link_set = set(product_df["product_url"])
+    logging.info(f"origin link's length ==> {len(link_set)}")
+
     driver = get_driver()
-    
+
     for category, id in category_ids.items():
-        logging.info(f'start {category} product list crawling')
+        logging.info(f"start {category} product list crawling")
         url = products_url.format(id=id)
         product_list = get_product_id(driver, url, max_num=product_max_num)
-        logging.info(f'done. new {len(product_list)} links crawled.')
+        logging.info(f"done. new {len(product_list)} links crawled.")
 
-        logging.info(f'start {category} product information crawling')
-        product_info = product_crawling(driver, category, product_list, link_set=link_set)
+        logging.info(f"start {category} product information crawling")
+        product_info = product_crawling(
+            driver, category, product_list, link_set=link_set
+        )
         product_info_df = pd.DataFrame(product_info).T
         product_df = pd.concat([product_df, product_info_df], ignore_index=True)
         product_df = set_rank(product_df, product_list)
-        logging.info('done.')
-        logging.info(f'length:: {len(product_df)}')
+        logging.info("done.")
+        logging.info(f"length:: {len(product_df)}")
 
-        logging.info(f'start {category} review crawling')
-        review_list = review_crawling(driver, product_list, review_max_num, category=category)
+        logging.info(f"start {category} review crawling")
+        review_list = review_crawling(
+            driver, product_list, review_max_num, category=category
+        )
         review_list_df = pd.DataFrame(review_list).T
         review_df = pd.concat([review_df, review_list_df], ignore_index=True)
-        logging.info('done.')
-        logging.info(f'length:: {len(review_df)}')
+        logging.info("done.")
+        logging.info(f"length:: {len(review_df)}")
 
-    save_df_to_s3(product_df, bucket_name, 'non-integrated-data/zigzag_products.csv')
-    save_df_to_s3(review_df, bucket_name, 'non-integrated-data/zigzag_reviews.csv')
+    save_df_to_s3(product_df, bucket_name, "non-integrated-data/zigzag_products.csv")
+    save_df_to_s3(review_df, bucket_name, "non-integrated-data/zigzag_reviews.csv")
 
     driver.quit()
-    
+
 
 default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
+    "owner": "airflow",
+    "depends_on_past": False,
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
 }
 
 dag = DAG(
-    'update_crawling_data',
+    "update_crawling_data",
     default_args=default_args,
-    description='A DAG to update new product and review data',
-    schedule_interval='@daily',
+    description="A DAG to update new product and review data",
+    schedule_interval="@daily",
     start_date=days_ago(1),
-    tags=['update_dag'],
+    tags=["update_dag"],
 )
 
 update_task = PythonOperator(
-    task_id='update_crawling_data',
+    task_id="update_crawling_data",
     python_callable=update_crawling_data,
-    op_kwargs={
-        'bucket_name': 'otto-glue'
-    },
+    op_kwargs={"bucket_name": "otto-glue"},
     dag=dag,
 )
 
