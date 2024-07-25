@@ -3,7 +3,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementNotInteractableException, WebDriverException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    ElementNotInteractableException,
+    WebDriverException,
+)
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
@@ -15,13 +20,14 @@ import pandas as pd
 
 import logging
 
+
 def create_log(msg):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    return f'{now} ==> {msg}'
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return f"{now} ==> {msg}"
 
 
 def scroll_down(driver):
-    actions = driver.find_element(By.CSS_SELECTOR, 'body')
+    actions = driver.find_element(By.CSS_SELECTOR, "body")
     actions.send_keys(Keys.END)
     actions.send_keys(Keys.END)
     actions.send_keys(Keys.END)
@@ -36,11 +42,15 @@ def get_or_none(webelement, xpath, by=By.XPATH):
         return webelement.find_element(by, xpath).text
     except NoSuchElementException as e:
         return
-    
+
 
 def crawling_product_name(wait):
     try:
-        tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'BODY_15.REGULAR.css-1qjogoj.e1wgb8lp0')))
+        tag = wait.until(
+            EC.presence_of_element_located(
+                (By.CLASS_NAME, "BODY_15.REGULAR.css-1qjogoj.e1wgb8lp0")
+            )
+        )
         time.sleep(0.5)
         return tag.text
     except TimeoutException as e:
@@ -50,12 +60,16 @@ def crawling_product_name(wait):
 
 def crawling_product_price(wait):
     try:
-        tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'css-14j45be.eizm2tm0')))
+        tag = wait.until(
+            EC.presence_of_element_located((By.CLASS_NAME, "css-14j45be.eizm2tm0"))
+        )
         time.sleep(0.5)
         return tag.text
     except TimeoutException as e:
         try:
-            tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'css-1fo6xrw.e1o0mpyu3')))
+            tag = wait.until(
+                EC.presence_of_element_located((By.CLASS_NAME, "css-1fo6xrw.e1o0mpyu3"))
+            )
             time.sleep(0.5)
             return tag.text
         except TimeoutException as e:
@@ -65,13 +79,21 @@ def crawling_product_price(wait):
 
 def crawling_product_img_url(wait):
     try:
-        tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'show-skeleton.css-12ywniv')))
-        src = tag.find_element(By.XPATH, './/picture/img').get_attribute('src')
+        tag = wait.until(
+            EC.presence_of_element_located((By.CLASS_NAME, "show-skeleton.css-12ywniv"))
+        )
+        src = tag.find_element(By.XPATH, ".//picture/img").get_attribute("src")
         return src
     except TimeoutException as e:
         try:
-            div = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'swiper-slide.swiper-slide-active')))
-            src = div.find_element(By.XPATH, './/div/div/picture/img').get_attribute('src')
+            div = wait.until(
+                EC.presence_of_element_located(
+                    (By.CLASS_NAME, "swiper-slide.swiper-slide-active")
+                )
+            )
+            src = div.find_element(By.XPATH, ".//div/div/picture/img").get_attribute(
+                "src"
+            )
             logging.info("crawled from first exception")
             return src
         except TimeoutException as e:
@@ -80,24 +102,36 @@ def crawling_product_img_url(wait):
 
 
 def get_color_tag_list(wait):
-    color_table = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'css-0.e1u2d7n04')))
-    return color_table.find_elements(By.TAG_NAME, 'li')
+    color_table = wait.until(
+        EC.presence_of_element_located((By.CLASS_NAME, "css-0.e1u2d7n04"))
+    )
+    return color_table.find_elements(By.TAG_NAME, "li")
 
 
 def color_crawling(driver):
-    color_string_tag = {'색상', 'color', '컬러'}
+    color_string_tag = {"색상", "color", "컬러"}
 
     color_set = set()
     wait = WebDriverWait(driver, 3)
-    buy_button = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'BODY_17.BOLD.css-hbld7k.e1yh52zv0')))
+    buy_button = wait.until(
+        EC.presence_of_element_located(
+            (By.CLASS_NAME, "BODY_17.BOLD.css-hbld7k.e1yh52zv0")
+        )
+    )
     ActionChains(driver).click(buy_button).perform()
-    toggle_tag = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'BODY_15.SEMIBOLD.css-utqis4.e1cn5bmz0')))
+    toggle_tag = wait.until(
+        EC.presence_of_element_located(
+            (By.CLASS_NAME, "BODY_15.SEMIBOLD.css-utqis4.e1cn5bmz0")
+        )
+    )
     tag_string = toggle_tag.text.lower()
-    tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+    tag_list = driver.find_element(By.CLASS_NAME, "css-0.e1u2d7n04").find_elements(
+        By.TAG_NAME, "li"
+    )
     if tag_string in color_string_tag:
         for color_tag in tag_list:
             time.sleep(0.1)
-            color = color_tag.text.split('\n')[0]
+            color = color_tag.text.split("\n")[0]
             color_set.add(color)
     else:
         for i in range(len(tag_list)):
@@ -105,77 +139,87 @@ def color_crawling(driver):
             tag = tag_list[i]
             time.sleep(1)
             tag.click()
-            color_tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+            color_tag_list = driver.find_element(
+                By.CLASS_NAME, "css-0.e1u2d7n04"
+            ).find_elements(By.TAG_NAME, "li")
             driver.implicitly_wait(1)
             for color_tag in color_tag_list:
                 time.sleep(0.1)
-                color = color_tag.text.split('\n')[0]
+                color = color_tag.text.split("\n")[0]
                 color_set.add(color)
-            tag_button = driver.find_element(By.CLASS_NAME, 'css-oa28ah.e1u2d7n06')
+            tag_button = driver.find_element(By.CLASS_NAME, "css-oa28ah.e1u2d7n06")
             tag_button.click()
             time.sleep(1)
-            tag_list = driver.find_element(By.CLASS_NAME, 'css-0.e1u2d7n04').find_elements(By.TAG_NAME, 'li')
+            tag_list = driver.find_element(
+                By.CLASS_NAME, "css-0.e1u2d7n04"
+            ).find_elements(By.TAG_NAME, "li")
             driver.implicitly_wait(1)
 
     return list(color_set)
 
 
 def size_crawling(driver, url):
-    button_tags = driver.find_elements(By.CLASS_NAME, 'BODY_16.SEMIBOLD.css-1qe1foo.e1wqfudt0')
+    button_tags = driver.find_elements(
+        By.CLASS_NAME, "BODY_16.SEMIBOLD.css-1qe1foo.e1wqfudt0"
+    )
     if len(button_tags) < 4:
-        return ['Free']
+        return ["Free"]
 
-    driver.get(url + '?tab=size')
+    driver.get(url + "?tab=size")
     wait = WebDriverWait(driver, 3)
     try:
-        size_tag_list = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'head.CAPTION_11.SEMIBOLD.css-oyuqpv.eqs9ftl0')))
+        size_tag_list = wait.until(
+            EC.presence_of_all_elements_located(
+                (By.CLASS_NAME, "head.CAPTION_11.SEMIBOLD.css-oyuqpv.eqs9ftl0")
+            )
+        )
         return list(map(lambda tag: tag.text, size_tag_list))
     except:
-        return 'none'
+        return "none"
 
 
 def product_crawling(driver, category, product_list, link_set=set()):
-    logging.info('start product crawling')
-    product_url = 'https://zigzag.kr/catalog/products/{product_id}'
+    logging.info("start product crawling")
+    product_url = "https://zigzag.kr/catalog/products/{product_id}"
     product_info = {}
     for i, product_id in enumerate(product_list):
         if product_url in link_set:
-            logging.info(f'product {product_id} already crawled')
+            logging.info(f"product {product_id} already crawled")
             continue
         logging.info(product_id)
         temp = {}
         url = product_url.format(product_id=product_id)
         driver.get(url)
         wait = WebDriverWait(driver, 3)
-        temp['product_id'] = product_id
-        temp['category'] = category
-        temp['description'] = url
-        temp['product_name'] = crawling_product_name(wait)
-        temp['price'] = crawling_product_price(wait)
-        temp['image_url'] = crawling_product_img_url(wait)
+        temp["product_id"] = product_id
+        temp["category"] = category
+        temp["description"] = url
+        temp["product_name"] = crawling_product_name(wait)
+        temp["price"] = crawling_product_price(wait)
+        temp["image_url"] = crawling_product_img_url(wait)
 
-        temp['size'] = size_crawling(driver, url)
+        temp["size"] = size_crawling(driver, url)
         try:
-            temp['color'] = color_crawling(driver)
+            temp["color"] = color_crawling(driver)
         except NoSuchElementException as e:
-            logging.info(f'error at product id (NSEE) :: {product_id}')
-            temp['color'] = 'none'
+            logging.info(f"error at product id (NSEE) :: {product_id}")
+            temp["color"] = "none"
         except ElementNotInteractableException as e:
-            logging.info(f'error at product id (ENIE) :: {product_id}')
-            temp['color'] = 'none'
+            logging.info(f"error at product id (ENIE) :: {product_id}")
+            temp["color"] = "none"
 
-        temp['rank'] = i + 1
+        temp["rank"] = i + 1
 
         product_info[product_id] = temp
         time.sleep(2)
-    
+
     return product_info
 
 
-def review_crawling(driver, product_list, max_num=10, category='top'):
-    logging.info('start review crawling')
-    review_url = 'https://zigzag.kr/review/list/{product_id}'
-    xpath = '/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]'
+def review_crawling(driver, product_list, max_num=10, category="top"):
+    logging.info("start review crawling")
+    review_url = "https://zigzag.kr/review/list/{product_id}"
+    xpath = "/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]"
     reviews = {}
 
     for product_id in product_list:
@@ -192,48 +236,50 @@ def review_crawling(driver, product_list, max_num=10, category='top'):
             try:
                 review_tag = wait.until(EC.presence_of_element_located((By.XPATH, x)))
             except TimeoutException as ee:
-                logging.info('no more review')
+                logging.info("no more review")
                 break
-            
+
             time.sleep(1)
-        
-            selected_color = get_or_none(review_tag, './/div/div[1]/span/span[1]')
-            selected_size = get_or_none(review_tag, './/div/div[1]/span/span[2]')
-            size_opinion = get_or_none(review_tag, './/div/div[2]/div[1]/span')
-            quality_opinion = get_or_none(review_tag, './/div/div[2]/div[2]/span')
-            color_opinion = get_or_none(review_tag, './/div/div[2]/div[3]/span')
 
-            height = get_or_none(review_tag, './/div/div[3]/span/span[1]')
-            weight = get_or_none(review_tag, './/div/div[3]/span/span[2]')
-            size = get_or_none(review_tag, './/div/div[3]/span/span[3]')
+            selected_color = get_or_none(review_tag, ".//div/div[1]/span/span[1]")
+            selected_size = get_or_none(review_tag, ".//div/div[1]/span/span[2]")
+            size_opinion = get_or_none(review_tag, ".//div/div[2]/div[1]/span")
+            quality_opinion = get_or_none(review_tag, ".//div/div[2]/div[2]/span")
+            color_opinion = get_or_none(review_tag, ".//div/div[2]/div[3]/span")
 
-            detail_text = get_or_none(review_tag, 'BODY_14.REGULAR.css-epr5m6.e1j2jqj72', by=By.CLASS_NAME)
-            review_id = f'{product_id}_{i}'
+            height = get_or_none(review_tag, ".//div/div[3]/span/span[1]")
+            weight = get_or_none(review_tag, ".//div/div[3]/span/span[2]")
+            size = get_or_none(review_tag, ".//div/div[3]/span/span[3]")
+
+            detail_text = get_or_none(
+                review_tag, "BODY_14.REGULAR.css-epr5m6.e1j2jqj72", by=By.CLASS_NAME
+            )
+            review_id = f"{product_id}_{i}"
 
             logging.info(review_id)
 
             temp = {
-                'review_id': review_id,
-                'product_id': product_id,
-                'color': selected_color,
-                'size': selected_size,
-                'size_comment': size_opinion,
-                'quality_comment': quality_opinion,
-                'color_comment': color_opinion,
-                'height': height,
-                'weight': weight,
-                'comment': detail_text
+                "review_id": review_id,
+                "product_id": product_id,
+                "color": selected_color,
+                "size": selected_size,
+                "size_comment": size_opinion,
+                "quality_comment": quality_opinion,
+                "color_comment": color_opinion,
+                "height": height,
+                "weight": weight,
+                "comment": detail_text,
             }
 
-            if category == 'top':
-                temp['top_size'] = size
-                temp['bottom_size'] = 'none'
+            if category == "top":
+                temp["top_size"] = size
+                temp["bottom_size"] = "none"
             else:
-                temp['top_size'] = 'none'
-                temp['bottom_size'] = size
+                temp["top_size"] = "none"
+                temp["bottom_size"] = size
 
             reviews[review_id] = temp
-    
+
     return reviews
 
 
@@ -247,25 +293,26 @@ def get_product_id(driver, url, max_num=10):
 
     for i in range(max_num):
         time.sleep(1)
+
         try:
             next_raw = driver.find_element(By.CSS_SELECTOR, f'div[data-index="{i}"]')
             driver.implicitly_wait(20)
             driver.execute_script("arguments[0].scrollIntoView(true);", next_raw)
             action.move_to_element_with_offset(next_raw, 0, 100).perform()
-            raw = next_raw.find_elements(By.CLASS_NAME, 'css-1jo7xgn')
+            raw = next_raw.find_elements(By.CLASS_NAME, "css-1jo7xgn")
             driver.implicitly_wait(20)
             for div in raw:
-                a = div.find_element(By.XPATH, './/div/a')
-                href = a.get_attribute('href')
+                a = div.find_element(By.XPATH, ".//div/a")
+                href = a.get_attribute("href")
                 time.sleep(0.1)
-                product_id = href.split('/')[-1]
+                product_id = href.split("/")[-1]
                 logging.info(product_id)
 
                 if product_id not in id_set:
                     id_list.append(product_id)
                     id_set.add(product_id)
                 time.sleep(0.5)
-                
+
                 if len(id_list) >= max_num:
                     return id_list
             time.sleep(0.5)
@@ -284,30 +331,29 @@ def get_product_id(driver, url, max_num=10):
 def add_product_name(products, reviews):
     for id, product in products.items():
         for review_id, review in reviews.items():
-            reviews[review_id]['product_name'] = product['product_name']
+            reviews[review_id]["product_name"] = product["product_name"]
     return reviews
 
 
 def main():
     category_ids = {
         # 'top' : '474',
-        'bottom' : '547'
+        "bottom": "547"
     }
     ## 리뷰순으로 정렬된 url
-    products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
+    products_url = "https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201"
 
     product_infos = {}
     reviews = {}
 
     options = Options()
     options.add_experimental_option("excludeSwitches", ["enable-logging"])
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    with webdriver.Chrome(\
-        service=Service(ChromeDriverManager().install(),\
-        options=options\
-    )) as driver:
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    with webdriver.Chrome(
+        service=Service(ChromeDriverManager().install(), options=options)
+    ) as driver:
         for category, id in category_ids.items():
             print(category)
             url = products_url.format(id=id)
@@ -326,28 +372,26 @@ def main():
     pd_product_infos = pd.DataFrame(product_infos).T
     pd_reviews = pd.DataFrame(reviews).T
 
-    pd_product_infos.to_csv("zigzag_product_infos.csv", encoding='utf-8-sig', index=True)
-    pd_reviews.to_csv("zigzag_reviews.csv", encoding='utf-8-sig', index=True)
+    pd_product_infos.to_csv(
+        "zigzag_product_infos.csv", encoding="utf-8-sig", index=True
+    )
+    pd_reviews.to_csv("zigzag_reviews.csv", encoding="utf-8-sig", index=True)
 
 
 def test():
-    category_ids = {
-        'top' : '474',
-        'bottom' : '547'
-    }
+    category_ids = {"top": "474", "bottom": "547"}
     ## 리뷰순으로 정렬된 url
-    products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
+    products_url = "https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201"
 
     options = Options()
     options.add_argument("--headless")
-    with webdriver.Chrome(\
-        service=Service(ChromeDriverManager().install(),\
-        options=options\
-    )) as driver:
+    with webdriver.Chrome(
+        service=Service(ChromeDriverManager().install(), options=options)
+    ) as driver:
         all_links = []
         # for category, id in category_ids.items():
         #     url = products_url.format(id=id)
-            
+
         #     # ## 제품 아이디 불러오는 거 확인
         #     link = get_product_id(driver, url, max_num=30)
         #     print(f'loaded {len(link)} from {category}')
@@ -383,8 +427,6 @@ def test():
         #     print(colors)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     # test()
     main()
-
