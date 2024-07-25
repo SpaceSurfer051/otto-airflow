@@ -41,7 +41,11 @@ def get_csv_from_s3(bucket_name, key):
         return df
     except Exception as e:
         logging.info(e)
-        return pd.DataFrame()
+        if 'products' in key:
+            columns = ['product_id', 'category', 'description', 'product_name', 'price', 'image_url', 'size', 'color', 'rank']
+        else:
+            columns = ['review_id', 'product_id', 'color', 'size', 'size_comment', 'quality_comment', 'color_comment', 'height', 'weight', 'comment', 'top_size', 'bottom_size', 'product_name']
+        return pd.DataFrame(columns=columns)
 
 
 # 데이터프레임을 S3에 저장하는 함수
@@ -69,9 +73,9 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     category_ids = {"top": "474", "bottom": "547"}
 
     # S3에서 기존 데이터 가져오기
-    product_df = get_csv_from_s3(bucket_name, "non-integrated-data/zigzag_products.csv")
-    review_df = get_csv_from_s3(bucket_name, "non-integrated-data/zigzag_reviews.csv")
-    link_set = set(product_df["product_url"])
+    product_df = get_csv_from_s3(bucket_name, "/non-integrated-data/zigzag_products.csv")
+    review_df = get_csv_from_s3(bucket_name, "/non-integrated-data/zigzag_reviews.csv")
+    link_set = set(product_df["description"])
     logging.info(f"origin link's length ==> {len(link_set)}")
 
     driver = get_driver()
@@ -101,8 +105,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         logging.info("done.")
         logging.info(f"length:: {len(review_df)}")
 
-    save_df_to_s3(product_df, bucket_name, "non-integrated-data/zigzag_products.csv")
-    save_df_to_s3(review_df, bucket_name, "non-integrated-data/zigzag_reviews.csv")
+    save_df_to_s3(product_df, bucket_name, "/non-integrated-data/zigzag_products.csv")
+    save_df_to_s3(review_df, bucket_name, "/non-integrated-data/zigzag_reviews.csv")
 
     driver.quit()
 
