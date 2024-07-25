@@ -6,6 +6,10 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from io import StringIO
 
+from zigzag_crawling import get_product_id
+from zigzag_crawling import product_crawling
+from zigzag_crawling import review_crawling
+
 import logging
 import pandas as pd
 
