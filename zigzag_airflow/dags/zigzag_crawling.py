@@ -134,11 +134,14 @@ def size_crawling(driver, url):
         return 'none'
 
 
-def product_crawling(driver, category, product_list):
+def product_crawling(driver, category, product_list, link_set=set()):
     logging.info('start product crawling')
     product_url = 'https://zigzag.kr/catalog/products/{product_id}'
     product_info = {}
     for i, product_id in enumerate(product_list):
+        if product_url in link_set:
+            logging.info(f'product {product_id} already crawled')
+            continue
         logging.info(product_id)
         temp = {}
         url = product_url.format(product_id=product_id)
@@ -234,7 +237,7 @@ def review_crawling(driver, product_list, max_num=10, category='top'):
     return reviews
 
 
-def get_product_id(driver, url, max_num=10, link_set=set()):
+def get_product_id(driver, url, max_num=10):
     id_set = set()
     id_list = []
     driver.get(url)
@@ -257,13 +260,11 @@ def get_product_id(driver, url, max_num=10, link_set=set()):
                 time.sleep(0.1)
                 product_id = href.split('/')[-1]
                 logging.info(product_id)
-                if href not in link_set:
-                    if product_id not in id_set:
-                        id_list.append(product_id)
-                        id_set.add(product_id)
-                    time.sleep(0.5)
-                else:
-                    logging.info(f'product id ({product_id}) is crawled already')
+
+                if product_id not in id_set:
+                    id_list.append(product_id)
+                    id_set.add(product_id)
+                time.sleep(0.5)
                 
                 if len(id_list) >= max_num:
                     return id_list
@@ -289,8 +290,8 @@ def add_product_name(products, reviews):
 
 def main():
     category_ids = {
-        'top' : '474',
-        # 'bottom' : '547'
+        # 'top' : '474',
+        'bottom' : '547'
     }
     ## 리뷰순으로 정렬된 url
     products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
@@ -310,11 +311,11 @@ def main():
         for category, id in category_ids.items():
             print(category)
             url = products_url.format(id=id)
-            product_list = get_product_id(driver, url, 1)
+            product_list = get_product_id(driver, url, 100)
             print(product_list)
             product_info_list = product_crawling(driver, category, product_list)
             print(product_info_list)
-            review_list = review_crawling(driver, product_list, 5, category=category)
+            review_list = review_crawling(driver, product_list, 20, category=category)
             print(review_list)
 
             product_infos.update(product_info_list)

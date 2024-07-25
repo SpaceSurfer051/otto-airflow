@@ -52,6 +52,13 @@ def save_df_to_s3(df, bucket_name, key):
     s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
 
 
+def set_rank(df, sorted_product_list):
+    df['rank'] = 'none'
+    rank_dict = {product_id: rank + 1 for rank, product_id in enumerate(sorted_product_list)}
+    df['rank'] = df['product_id'].map(rank_dict).fillna('none')
+    
+    return df
+
 def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     products_url = 'https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201'
     category_ids = {
@@ -68,13 +75,14 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     for category, id in category_ids.items():
         logging.info(f'start {category} product list crawling')
         url = products_url.format(id=id)
-        product_list = get_product_id(driver, url, max_num=product_max_num, link_set=link_set)
+        product_list = get_product_id(driver, url, max_num=product_max_num)
         logging.info(f'done. new {len(product_list)} links crawled.')
 
         logging.info(f'start {category} product information crawling')
-        product_info = product_crawling(driver, category, product_list)
+        product_info = product_crawling(driver, category, product_list, link_set=link_set)
         product_info_df = pd.DataFrame(product_info).T
         product_df = pd.concat([product_df, product_info_df], ignore_index=True)
+        product_df = set_rank(product_df, product_list)
         logging.info('done.')
         logging.info(f'length:: {len(product_df)}')
 
