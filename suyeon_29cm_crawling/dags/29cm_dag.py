@@ -7,6 +7,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.exceptions import AirflowException
 import logging
 from airflow.utils.dates import days_ago
+import re
 import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -60,13 +61,13 @@ def parse_review(lines):
 
 
 def get_product_details(driver, product, already_in_s3):
-    
     try:
         product_name = product.find('a', class_='css-5cm1aq').get('title')
         product_link = product.find('a', class_='css-5cm1aq').get('href')
         if product_link in already_in_s3:
             logging.info("\n{} is already in s3\n".format(product_name))
-            return None, None, None, None, None, None, None
+            return None, "none", product_link, "none", "none", "none"
+        logging.info("\n{}\n".format(product_name))
         image_link = product.find('img').get('src')
         driver.get(product_link)
         sleep(1)
@@ -86,13 +87,14 @@ def get_product_details(driver, product, already_in_s3):
         detail_info = soup.find('table', class_='e1hw6jas2 css-1x7jfi1 exbpx9h0').find_all('td', "css-q35or5 exbpx9h2")
         color = detail_info[1].text
         size = detail_info[2].text
-        return product_name, image_link, product_link, product_name, price, color, size
+        
+        return product_name, image_link, product_link, price, color, size
     except Exception as e:
         print(f"Error while fetching product information: {e}")
-        return None, None, None, None, None, None, None
+        return "none", "none", None, "none", "none", "none"
 
 
-def get_reviews(driver, product_name, review_data):
+def get_reviews(driver, product_name, review_data, gender):
     try:
         actions = driver.find_element(By.CSS_SELECTOR, 'body')
         sleep(1)
@@ -111,8 +113,25 @@ def get_reviews(driver, product_name, review_data):
 
             lines = divs.split('\n')
             option, height, weight, size_comment = parse_review(lines)
+            
+            review_data['review_id'].append("none")
+            review_data['top_size'].append("none")
+            review_data['bottom_size'].append("none")
+            review_data['quality_comment'].append("none")
+            review_data['color_comment'].append("none")
+            review_data['thickness_comment'].append("none")
+            review_data['brightness_comment'].append("none")
             review_data['product_name'].append(product_name)
-            review_data['option'].append(option)
+            review_data['gender'].append(gender)
+            
+            color_match = re.search(r'\[(Color|color|컬러)\](.*?)\[', option)
+            size_match = re.search(r'\[(Size|size|사이즈)\](.*?)\,', option)
+
+            color = color_match.group(2).strip() if color_match else "none"
+            size = size_match.group(2).strip() if size_match else "none"
+            
+            review_data['color'].append(color)
+            review_data['size'].append(size)
             review_data['height'].append(height)
             review_data['weight'].append(weight)
             review_data['size_comment'].append(size_comment)
@@ -144,33 +163,61 @@ def update_29cm(already_in_s3):
         print(f"Error initializing WebDriver: {e}")
         return
 
-    product_data = {'product_name': [], 'category' : [], 'price': [], 'image_url': [], 'description' : [], 'color' : [], 'size' : []}
-    review_data = {'product_name': [], 'option' : [], 'height': [], 'weight' : [], 'size_comment': [], 'comment' : []}
+    product_data = {'product_id' : [], 'rank' : [], 'product_name' : [], 'category' : [], 'price': [], 'image_url': [], 'description' : [], 'color' : [], 'size' : []}
+    review_data = {'review_id' : [], 'product_name': [], 'color' : [], 'size' : [], 'height': [], 'gender': [], 'weight' : [], 'top_size': [], 'bottom_size':[], 'size_comment': [], 'quality_comment': [], 'color_comment': [], 'thickness_comment': [], 'brightness_comment': [], 'comment' : []}
 
     try:
-        start_url = "https://shop.29cm.co.kr/category/list?categoryLargeCode=268100100&categoryMediumCode=268103100&sort=REVIEW&defaultSort=RECOMMEND&sortOrder=DESC&page=1"
-        driver.get(start_url)
-        sleep(2)
+        start_urls = ["https://shop.29cm.co.kr/category/list?categoryLargeCode=268100100&categoryMediumCode=268103100&sort=REVIEW&defaultSort=RECOMMEND&sortOrder=DESC&page=1", "https://shop.29cm.co.kr/category/list?colors=&categoryLargeCode=268100100&categoryMediumCode=268106100&categorySmallCode=&minPrice=&maxPrice=&isFreeShipping=&excludeSoldOut=&isDiscount=&brands=&sort=REVIEW&defaultSort=RECOMMEND&sortOrder=DESC&tag=&extraFacets=", "https://shop.29cm.co.kr/category/list?categoryLargeCode=272100100&categoryMediumCode=272103100&sort=REVIEW&defaultSort=RECOMMEND&sortOrder=DESC&page=1","https://shop.29cm.co.kr/category/list?colors=&categoryLargeCode=272100100&categoryMediumCode=272104100&categorySmallCode=&minPrice=&maxPrice=&isFreeShipping=&excludeSoldOut=&isDiscount=&brands=&sort=REVIEW&defaultSort=RECOMMEND&sortOrder=DESC&tag=&extraFacets="]
+        for i in range(len(start_urls)):
+            if i < 2 :
+                gender = "여성"
+            else:
+                gender = "남성"
+                
+            if i % 2 == 0:
+                category = "top"
+            else:
+                category = "bottom"
+                
+            driver.get(start_urls[i])
+            sleep(2)
 
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
+            html = driver.page_source
+            soup = BeautifulSoup(html, 'html.parser')
 
-        products = soup.find_all('li', class_='css-1teigi4 e1114pfz0')
-        for product in products:
-            product_name, image_link, product_link, product_name, price, color, size = get_product_details(driver, product, already_in_s3)
-            if product_link and product_name:
-                flag = get_reviews(driver, product_name, review_data)
-                if flag:
-                    logging.info("\nproduce_name : {}\n".format(product_name))
-                    product_data['product_name'].append(product_name)
-                    product_data['category'].append("top")
+            products = soup.find_all('li', class_='css-1teigi4 e1114pfz0')
+            rank = 0
+            for product in products:
+                rank += 1
+                product_name, image_link, product_link, price, color, size = get_product_details(driver, product, already_in_s3)
+                if product_link and product_name:
+                    flag = get_reviews(driver, product_name, review_data, gender)
+                    if flag:
+                        product_data['product_id'].append("none")
+                        product_data['rank'].append(rank)
+                        product_data['product_name'].append(product_name)
+                        product_data['category'].append(category)
+                        product_data['price'].append(price)
+                        product_data['image_url'].append(image_link)
+                        product_data['description'].append(product_link)
+                        product_data['color'].append(color)
+                        product_data['size'].append(size)
+                    driver.back()
+                    sleep(1)
+                elif product_link:
+                    product_data['product_id'].append("none")
+                    product_data['rank'].append(rank)
+                    product_data['product_name'].append("none")
+                    product_data['category'].append(category)
                     product_data['price'].append(price)
                     product_data['image_url'].append(image_link)
                     product_data['description'].append(product_link)
                     product_data['color'].append(color)
                     product_data['size'].append(size)
-                driver.back()
-                sleep(1)
+                    
+                    driver.back()
+                    sleep(1)
+                    
     except Exception as e:
         print(f"Error during main crawling process: {e}")
     finally:
@@ -180,8 +227,8 @@ def update_29cm(already_in_s3):
             product_df = pd.DataFrame(product_data)
             review_df = pd.DataFrame(review_data)
 
-            return product_df, review_df
             logging.info(product_df["product_name"].tolist())
+            return product_df, review_df
         except Exception as e:
             print(f"Error while saving CSV files: {e}")
 
@@ -193,21 +240,47 @@ def update_29cm(already_in_s3):
 
 def upload_to_s3(old_product_df, old_review_df, new_product_df, new_review_df):
     logging.info("\nstart upload_to_s3\n")
-    updated_product_df = pd.concat([old_product_df, new_product_df], ignore_index=True)
+
+    updated_data = []
+    for _, new_row in new_product_df.iterrows():
+        old_row = old_product_df[old_product_df['description'] == new_row['description']]
+        if old_row.empty or old_row.iloc[0]["product_name"] == "none":
+            size = new_row['size']
+            color = new_row['color']
+            product_name = new_row['product_name']
+            category = new_row['category']
+            price = new_row['price']
+            image_url = new_row['image_url']
+        else: 
+            size = old_row.iloc[0]['size']
+            color = old_row.iloc[0]['color']
+            product_name = old_row.iloc[0]['product_name']
+            category = old_row.iloc[0]['category']
+            price = old_row.iloc[0]['price']
+            image_url = old_row.iloc[0]['image_url']
+        updated_data.append(["none", new_row['rank'], product_name, category, price, image_url, new_row['description'], color, size])
+        
+    for _, old_row in old_product_df.iterrows():
+        new_row = new_product_df[new_product_df['description'] == old_row['description']]
+        if new_row.empty:
+            updated_data.append([old_row["product_id"], "none", old_row["product_name"], old_row["category"], old_row["price"], old_row["image_url"], old_row['description'], old_row["color"], old_row["size"]])
+
+    updated_product_df = pd.DataFrame(updated_data, columns=['product_id', 'rank', 'product_name', 'category', 'price', 'image_url', 'description', 'color', 'size']).fillna("")
+    logging.info("\nfinish updated_product_df\n")
     updated_review_df = pd.concat([old_review_df, new_review_df], ignore_index=True)
-    
+
     logging.info(updated_product_df.head())
-    
+
     updated_product_csv = StringIO()
     updated_review_csv = StringIO()
     updated_product_df.to_csv(updated_product_csv, index=False, encoding='utf-8-sig')
     updated_review_df.to_csv(updated_review_csv, index=False, encoding='utf-8-sig')
-    
+
     s3_hook = S3Hook('s3_conn_id')
     s3_client = s3_hook.get_conn()
     s3_bucket = "otto-default"
-    product_key = '29cm_data/new_29cm_women_top_products.csv'
-    review_key = '29cm_data/new_29cm_women_top_reviews.csv'
+    product_key = '29cm_data/new_29cm_products.csv'
+    review_key = '29cm_data/new_29cm_reviews.csv'
 
     s3_client.put_object(Bucket=s3_bucket, Key=product_key, Body=updated_product_csv.getvalue())
     s3_client.put_object(Bucket=s3_bucket, Key=review_key, Body=updated_review_csv.getvalue())
@@ -221,14 +294,14 @@ def read_s3():
     
     s3_hook = S3Hook(aws_conn_id='s3_conn_id')
     bucket_name = 'otto-default'
-    product_key = '29cm_data/29cm_women_top_products.csv'
-    review_key = '29cm_data/29cm_women_top_reviews.csv'
+    product_key = '29cm_data/29cm_products.csv'
+    review_key = '29cm_data/29cm_reviews.csv'
 
     s3_client = s3_hook.get_conn()
     product_obj = s3_client.get_object(Bucket=bucket_name, Key=product_key)
     review_obj = s3_client.get_object(Bucket=bucket_name, Key=review_key)
-    product_df = pd.read_csv(StringIO(product_obj['Body'].read().decode('utf-8-sig')))
-    review_df = pd.read_csv(StringIO(review_obj['Body'].read().decode('utf-8-sig')))
+    product_df = pd.read_csv(StringIO(product_obj['Body'].read().decode('utf-8')))
+    review_df = pd.read_csv(StringIO(review_obj['Body'].read().decode('utf-8')))
     links = set(product_df["description"])
     
     logging.info("\nfinish read_s3\n")
@@ -239,7 +312,9 @@ def run_crawling_29cm():
     logging.info("\nstart run_crawling_29cm\n")
     
     old_product_df, old_review_df, already_in_s3 = read_s3()
+    logging.info("\nold_product_df : {}\n".format(old_product_df.head()))
     new_product_df, new_review_df = update_29cm(already_in_s3)
+    logging.info("\nnew_product_df : {}\n".format(new_product_df.head()))
     upload_to_s3(old_product_df, old_review_df, new_product_df, new_review_df)
     
     logging.info("\nfinish run_crawling_29cm\n")
@@ -250,12 +325,6 @@ crawling_task = PythonOperator(
     python_callable=run_crawling_29cm,
     dag=dag,
 )
-
-#upload_task = PythonOperator(
-#    task_id='upload_to_s3',
-#    python_callable=upload_to_s3,
-#    dag=dag,
-#)
 
 
 crawling_task

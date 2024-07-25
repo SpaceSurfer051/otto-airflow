@@ -1,2 +1,0 @@
-aws otto-default access key : AKIAZQ3DNY2P6F2LYZ5P
-secret access key : 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
