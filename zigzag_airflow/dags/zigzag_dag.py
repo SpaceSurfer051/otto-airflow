@@ -73,8 +73,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
     category_ids = {"top": "474", "bottom": "547"}
 
     # S3에서 기존 데이터 가져오기
-    product_df = get_csv_from_s3(bucket_name, "zigzag/zigzag_products.csv")
-    review_df = get_csv_from_s3(bucket_name, "zigzag/zigzag_reviews.csv")
+    product_df = get_csv_from_s3(bucket_name, "/non-integrated-data/zigzag_products.csv")
+    review_df = get_csv_from_s3(bucket_name, "/non-integrated-data/zigzag_reviews.csv")
     link_set = set(product_df["description"])
     logging.info(f"origin link's length ==> {len(link_set)}")
 
@@ -105,8 +105,8 @@ def update_crawling_data(bucket_name, product_max_num=10, review_max_num=20):
         logging.info("done.")
         logging.info(f"length:: {len(review_df)}")
 
-    save_df_to_s3(product_df, bucket_name, "zigzag/zigzag_products_new.csv")
-    save_df_to_s3(review_df, bucket_name, "zigzag/zigzag_reviews_new.csv")
+    save_df_to_s3(product_df, bucket_name, "/non-integrated-data/zigzag_products.csv")
+    save_df_to_s3(review_df, bucket_name, "/non-integrated-data/zigzag_reviews.csv")
 
     driver.quit()
 
@@ -133,7 +133,7 @@ dag = DAG(
 update_task = PythonOperator(
     task_id="update_crawling_data",
     python_callable=update_crawling_data,
-    op_kwargs={"bucket_name": "otto-default"},
+    op_kwargs={"bucket_name": "otto-glue"},
     dag=dag,
 )
 
