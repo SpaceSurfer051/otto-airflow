@@ -1,6 +1,0 @@
-{
-    "notebook.defaultFormatter": "ms-python.black-formatter",
-    "files.autoSaveWorkspaceFilesOnly": true,
-    "editor.defaultFormatter": "ms-python.black-formatter",
-    "editor.formatOnSave": true
-}
