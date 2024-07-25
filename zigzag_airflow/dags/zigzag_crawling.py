@@ -214,7 +214,7 @@ def product_crawling(driver, category, product_list, link_set=set()):
     return product_info
 
 
-def review_crawling(driver, product_list, max_num=10, category="top"):
+def review_crawling(driver, product_list, max_num=10, category="top", link_set=set()):
     logging.info("start review crawling")
     review_url = "https://zigzag.kr/review/list/{product_id}"
     xpath = "/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]"
@@ -223,6 +223,9 @@ def review_crawling(driver, product_list, max_num=10, category="top"):
     for product_id in product_list:
         logging.info(product_id)
         url = review_url.format(product_id=product_id)
+        if url in link_set:
+            logging.info(f"product {product_id} review already crawled")
+            continue
         driver.get(url)
         wait = WebDriverWait(driver, 3)
 
