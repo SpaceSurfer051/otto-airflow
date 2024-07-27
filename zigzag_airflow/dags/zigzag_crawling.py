@@ -176,12 +176,12 @@ def size_crawling(driver, url):
         return "none"
 
 
-def product_crawling(driver, category, product_list, link_set=set()):
+def product_crawling(driver, category, product_list, product_set=set()):
     logging.info("start product crawling")
     product_url = "https://zigzag.kr/catalog/products/{product_id}"
     product_info = {}
     for i, product_id in enumerate(product_list):
-        if product_url in link_set:
+        if product_id in product_set:
             logging.info(f"product {product_id} already crawled")
             continue
         logging.info(product_id)
@@ -214,7 +214,9 @@ def product_crawling(driver, category, product_list, link_set=set()):
     return product_info
 
 
-def review_crawling(driver, product_list, max_num=10, category="top", link_set=set()):
+def review_crawling(
+    driver, product_list, max_num=10, category="top", product_set=set()
+):
     logging.info("start review crawling")
     review_url = "https://zigzag.kr/review/list/{product_id}"
     xpath = "/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]"
@@ -223,7 +225,7 @@ def review_crawling(driver, product_list, max_num=10, category="top", link_set=s
     for product_id in product_list:
         logging.info(product_id)
         url = review_url.format(product_id=product_id)
-        if url in link_set:
+        if product_id in product_set:
             logging.info(f"product {product_id} review already crawled")
             continue
         driver.get(url)
