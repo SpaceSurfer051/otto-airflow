@@ -22,4 +22,4 @@ jobs:
 
     - name: Sync dags folder to S3
       run: |
-        aws s3 sync dags/ s3://otto-test-2 --delete
+        aws s3 sync dags/ s3://team-jun-2-bucket --delete
