@@ -7,22 +7,93 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import ElementNotInteractableException
 from selenium.common.exceptions import WebDriverException
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver import ActionChains
+from webdriver_manager.chrome import ChromeDriverManager
 
 from datetime import datetime
 import time
 import pandas as pd
-
 import logging
+from io import StringIO
+from airflow.hooks.S3_hook import S3Hook
 
+# 웹 드라이버를 생성하는 함수
+def get_driver():
+    logging.info("creating driver.")
+    options = Options()
+    options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    options.add_argument("--headless")  # GUI를 표시하지 않음
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    remote_webdriver = "http://remote_chromedriver:4444/wd/hub"
+    driver = webdriver.Remote(command_executor=remote_webdriver, options=options)
+    logging.info("driver created.")
+    return driver
+
+# S3에서 CSV 파일을 읽어오는 함수
+def get_csv_from_s3(bucket_name, key):
+    try:
+        s3_hook = S3Hook(aws_conn_id="aws_s3")
+        s3_client = s3_hook.get_conn()
+        obj = s3_client.get_object(Bucket=bucket_name, Key=key)
+        df = pd.read_csv(StringIO(obj["Body"].read().decode("utf-8-sig")))
+        logging.info(f"successfully get csv file from {key}")
+        logging.info(f"loaded csv length ::: {len(df)}")
+        return df
+    except Exception as e:
+        logging.info(e)
+        if "products" in key:
+            columns = [
+                "product_id",
+                "category",
+                "description",
+                "product_name",
+                "price",
+                "image_url",
+                "size",
+                "color",
+                "rank",
+            ]
+        else:
+            columns = [
+                "review_id",
+                "product_id",
+                "color",
+                "size",
+                "size_comment",
+                "quality_comment",
+                "color_comment",
+                "height",
+                "weight",
+                "comment",
+                "top_size",
+                "bottom_size",
+                "product_name",
+            ]
+        return pd.DataFrame(columns=columns)
+
+# 데이터프레임을 S3에 저장하는 함수
+def save_df_to_s3(df, bucket_name, key):
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
+    s3_hook = S3Hook(aws_conn_id="aws_s3")
+    s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
+
+# 데이터프레임에 순위를 설정하는 함수
+def set_rank(df, sorted_product_list):
+    df["rank"] = "none"
+    rank_dict = {
+        product_id: rank + 1 for rank, product_id in enumerate(sorted_product_list)
+    }
+    df["rank"] = df["product_id"].map(rank_dict).fillna("none")
+    return df
 
 def create_log(msg):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     return f"{now} ==> {msg}"
-
 
 def scroll_down(driver):
     actions = driver.find_element(By.CSS_SELECTOR, "body")
@@ -33,14 +104,12 @@ def scroll_down(driver):
     actions.send_keys(Keys.END)
     time.sleep(0.5)
 
-
 def get_or_none(webelement, xpath, by=By.XPATH):
     try:
         time.sleep(0.1)
         return webelement.find_element(by, xpath).text
     except NoSuchElementException as e:
         return
-
 
 def crawling_product_name(wait):
     try:
@@ -54,7 +123,6 @@ def crawling_product_name(wait):
     except TimeoutException as e:
         logging.info(f"exception at `crawling_product_name` => {e}")
         return
-
 
 def crawling_product_price(wait):
     try:
@@ -73,7 +141,6 @@ def crawling_product_price(wait):
         except TimeoutException as e:
             logging.info(f"exception at `crawling_product_price` => {e}")
             return
-
 
 def crawling_product_img_url(wait):
     try:
@@ -98,13 +165,11 @@ def crawling_product_img_url(wait):
             logging.info(f"exception at crawling_product_img_url` => {e}")
             return
 
-
 def get_color_tag_list(wait):
     color_table = wait.until(
         EC.presence_of_element_located((By.CLASS_NAME, "css-0.e1u2d7n04"))
     )
     return color_table.find_elements(By.TAG_NAME, "li")
-
 
 def color_crawling(driver):
     color_string_tag = {"색상", "color", "컬러"}
@@ -155,7 +220,6 @@ def color_crawling(driver):
 
     return list(color_set)
 
-
 def size_crawling(driver, url):
     button_tags = driver.find_elements(
         By.CLASS_NAME, "BODY_16.SEMIBOLD.css-1qe1foo.e1wqfudt0"
@@ -175,13 +239,12 @@ def size_crawling(driver, url):
     except:
         return "none"
 
-
-def product_crawling(driver, category, product_list, link_set=set()):
+def product_crawling(driver, category, product_list, product_set=set()):
     logging.info("start product crawling")
     product_url = "https://zigzag.kr/catalog/products/{product_id}"
     product_info = {}
     for i, product_id in enumerate(product_list):
-        if product_url in link_set:
+        if product_id in product_set:
             logging.info(f"product {product_id} already crawled")
             continue
         logging.info(product_id)
@@ -213,8 +276,9 @@ def product_crawling(driver, category, product_list, link_set=set()):
 
     return product_info
 
-
-def review_crawling(driver, product_list, max_num=10, category="top"):
+def review_crawling(
+    driver, product_list, max_num=10, category="top", product_set=set()
+):
     logging.info("start review crawling")
     review_url = "https://zigzag.kr/review/list/{product_id}"
     xpath = "/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]"
@@ -223,6 +287,9 @@ def review_crawling(driver, product_list, max_num=10, category="top"):
     for product_id in product_list:
         logging.info(product_id)
         url = review_url.format(product_id=product_id)
+        if product_id in product_set:
+            logging.info(f"product {product_id} review already crawled")
+            continue
         driver.get(url)
         wait = WebDriverWait(driver, 3)
 
@@ -280,7 +347,6 @@ def review_crawling(driver, product_list, max_num=10, category="top"):
 
     return reviews
 
-
 def get_product_id(driver, url, max_num=10):
     id_set = set()
     id_list = []
@@ -325,13 +391,58 @@ def get_product_id(driver, url, max_num=10):
 
     return id_list
 
-
 def add_product_name(products, reviews):
     for id, product in products.items():
         for review_id, review in reviews.items():
             reviews[review_id]["product_name"] = product["product_name"]
     return reviews
 
+def update_crawling_data(bucket_name, product_max_num=100, review_max_num=20):
+    products_url = "https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201"
+    category_ids = {"top": "474", "bottom": "547"}
+
+    product_df = get_csv_from_s3(
+        bucket_name, "/non-integrated-data/zigzag_products.csv"
+    )
+    review_df = get_csv_from_s3(bucket_name, "/non-integrated-data/zigzag_reviews.csv")
+    product_set = set(product_df["product_id"])
+    logging.info(f"origin link's length ==> {len(product_set)}")
+
+    driver = get_driver()
+
+    for category, id in category_ids.items():
+        logging.info(f"start {category} product list crawling")
+        url = products_url.format(id=id)
+        product_list = get_product_id(driver, url, max_num=product_max_num)
+        logging.info(f"done. new {len(product_list)} links crawled.")
+
+        logging.info(f"start {category} product information crawling")
+        product_info = product_crawling(
+            driver, category, product_list, product_set=product_set
+        )
+        product_info_df = pd.DataFrame(product_info).T
+        product_df = pd.concat([product_df, product_info_df], ignore_index=True)
+        product_df = set_rank(product_df, product_list)
+        logging.info("done.")
+        logging.info(f"length:: {len(product_df)}")
+
+        logging.info(f"start {category} review crawling")
+        review_list = review_crawling(
+            driver,
+            product_list,
+            review_max_num,
+            category=category,
+            product_set=product_set,
+        )
+        review_list_df = pd.DataFrame(review_list).T
+        review_df = pd.concat([review_df, review_list_df], ignore_index=True)
+        logging.info("done.")
+        logging.info(f"length:: {len(review_df)}")
+
+    save_df_to_s3(product_df, bucket_name, "/non-integrated-data/zigzag_products.csv")
+    save_df_to_s3(review_df, bucket_name, "/non-integrated-data/zigzag_reviews.csv")
+
+    driver.quit()
 
 def main():
     category_ids = {
@@ -374,7 +485,6 @@ def main():
         "zigzag_product_infos.csv", encoding="utf-8-sig", index=True
     )
     pd_reviews.to_csv("zigzag_reviews.csv", encoding="utf-8-sig", index=True)
-
 
 def test():
     category_ids = {"top": "474", "bottom": "547"}
@@ -423,7 +533,6 @@ def test():
         #     driver.get(link)
         #     colors = color_crawling(driver)
         #     print(colors)
-
 
 if __name__ == "__main__":
     # test()

@@ -25,11 +25,15 @@ from airflow.utils.task_group import TaskGroup
 #from code_test.airflow_data_preprocessing import data_processing
 #from code_test.airflow_data_integrated import integrate_data
 
+
+# musinsa
 from airflow_product_review import read_s3_and_compare_links
 from airflow_size_color import read_s3_and_add_size_color
 from airflow_data_preprocessing import data_processing
 from airflow_data_integrated import integrate_data
 
+# zigzag
+from zigzag_dag import update_crawling_data
 
 #from zigzag_crawling import get_product_id, product_crawling, review_crawling
 
@@ -41,13 +45,13 @@ default_args = {
     "start_date": days_ago(1),
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": 1,
+    "retries": 3,
     "retry_delay": timedelta(minutes=2),
 }
 
 # DAG 설정
 dag = DAG(
-    "crawling_dag",
+    "all_update_dag",
     default_args=default_args,
     description="DAG to crawl and compare links, then add size and color information",
     schedule_interval=timedelta(days=1),
@@ -200,7 +204,7 @@ with dag:
 
         # 29cm 사이트에서 제품 정보를 업데이트하는 함수
         def update_29cm(already_in_s3):
-            logging.info("\nstart update_29cm\n")
+           # logging.info("\nstart update_29cm\n")
 
             start_time = time.time()
 
@@ -465,4 +469,10 @@ with dag:
             dag=dag,
         )
 
-    task_29cm_group >> musinsa_task_group
+    
+    with TaskGroup('zigzag_task_group', tooltip= "Tasks for zigzag data update") as task_zigzag_group:
+        update_zigzag_task = PythonOperator(
+            task_id='update_zigzag_data_crawling',
+            Python_callable= update_crawling_data,
+        )
+    task_zigzag_group >> task_29cm_group >> musinsa_task_group
