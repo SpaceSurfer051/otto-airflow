@@ -34,7 +34,7 @@ from airflow_data_integrated import integrate_data
 
 # zigzag
 from zigzag_crawling import update_crawling_data
-# 체크 0729
+# 체크 0729 - 2
 #from zigzag_crawling import get_product_id, product_crawling, review_crawling
 
 
