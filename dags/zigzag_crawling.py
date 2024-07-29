@@ -38,6 +38,7 @@ def get_csv_from_s3(bucket_name, key):
         s3_client = s3_hook.get_conn()
         obj = s3_client.get_object(Bucket=bucket_name, Key=key)
         df = pd.read_csv(StringIO(obj["Body"].read().decode("utf-8-sig")))
+        df = df.drop_duplicates()  # 중복 제거
         logging.info(f"successfully get csv file from {key}")
         logging.info(f"loaded csv length ::: {len(df)}")
         return df
@@ -75,6 +76,7 @@ def get_csv_from_s3(bucket_name, key):
 
 # 데이터프레임을 S3에 저장하는 함수
 def save_df_to_s3(df, bucket_name, key):
+    df = df.drop_duplicates()  # 중복 제거
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     s3_hook = S3Hook(aws_conn_id="aws_s3")
@@ -272,7 +274,7 @@ def product_crawling(driver, category, product_list, product_set=set()):
 
     return product_info
 
-def review_crawling(driver, product_list, max_num=100, category="top", product_set=set()):
+def review_crawling(driver, product_list, max_num=10, category="top", product_set=set()):
     logging.info("start review crawling")
     review_url = "https://zigzag.kr/review/list/{product_id}"
     xpath = "/html/body/div/div[1]/div/div/div/div[2]/div/div/section/div[{i}]/div[1]/div[3]"
@@ -339,7 +341,7 @@ def review_crawling(driver, product_list, max_num=100, category="top", product_s
 
     return reviews
 
-def get_product_id(driver, url, max_num=100):
+def get_product_id(driver, url, max_num=10):
     id_set = set()
     id_list = []
     driver.get(url)
@@ -390,7 +392,7 @@ def add_product_name(products, reviews):
             reviews[review_id]["product_name"] = products[product_id]["product_name"]
     return reviews
 
-def update_crawling_data(bucket_name, product_max_num=100, review_max_num=10):
+def update_crawling_data(bucket_name, product_max_num=10, review_max_num=10):
     products_url = "https://zigzag.kr/categories/-1?title=%EC%9D%98%EB%A5%98&category_id=-1&middle_category_id={id}&sort=201"
     category_ids = {"top": "474", "bottom": "547"}
 
