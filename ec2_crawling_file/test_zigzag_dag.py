@@ -37,7 +37,7 @@ dag = DAG(
     "zigzag_update_dag",
     default_args=default_args,
     description="DAG to crawl and compare links, then add size and color information",
-    schedule_interval=timedelta(days=1),
+    
 )
 
 with dag:
