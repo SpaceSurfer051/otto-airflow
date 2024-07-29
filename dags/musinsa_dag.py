@@ -469,11 +469,15 @@ with dag:
             dag=dag,
         )
 
-    
+
+    task_29cm_group >> musinsa_task_group
+
+'''
     with TaskGroup('zigzag_task_group', tooltip= "Tasks for zigzag data update") as task_zigzag_group:
         update_zigzag_task = PythonOperator(
             task_id='update_zigzag_data_crawling',
             python_callable= update_crawling_data,
             op_kwargs={'bucket_name': 'otto-glue'},
         )
-    task_zigzag_group >> task_29cm_group >> musinsa_task_group
+        
+'''

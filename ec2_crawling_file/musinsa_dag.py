@@ -33,7 +33,7 @@ from airflow_data_preprocessing import data_processing
 from airflow_data_integrated import integrate_data
 
 # zigzag
-from zigzag_dag import update_crawling_data
+from zigzag_crawling import update_crawling_data
 
 #from zigzag_crawling import get_product_id, product_crawling, review_crawling
 
@@ -58,6 +58,7 @@ dag = DAG(
 )
 
 with dag:
+
     with TaskGroup('musinsa_task_group', tooltip="Tasks for Musinsa data processing") as musinsa_task_group:
         crawl_task = PythonOperator(
             task_id='read_s3_and_compare_links',
@@ -473,6 +474,7 @@ with dag:
     with TaskGroup('zigzag_task_group', tooltip= "Tasks for zigzag data update") as task_zigzag_group:
         update_zigzag_task = PythonOperator(
             task_id='update_zigzag_data_crawling',
-            Python_callable= update_crawling_data,
+            python_callable= update_crawling_data,
+            op_kwargs={'bucket_name': 'otto-glue'},
         )
     task_zigzag_group >> task_29cm_group >> musinsa_task_group

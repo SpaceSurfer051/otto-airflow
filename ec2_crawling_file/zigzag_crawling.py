@@ -24,12 +24,12 @@ def get_driver():
     logging.info("creating driver.")
     options = Options()
     options.add_experimental_option("excludeSwitches", ["enable-logging"])
-    options.add_argument("--headless")  # GUI를 표시하지 않음
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-
-    remote_webdriver = "http://remote_chromedriver:4444/wd/hub"
-    driver = webdriver.Remote(command_executor=remote_webdriver, options=options)
+    options.add_argument('--headless')  # GUI를 표시하지 않음
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    
+    service = Service('/usr/local/bin/chromedriver')
+    driver = webdriver.Chrome(service=service, options=options)
     logging.info("driver created.")
     return driver
 
@@ -156,14 +156,13 @@ def crawling_product_img_url(wait):
                     (By.CLASS_NAME, "swiper-slide.swiper-slide-active")
                 )
             )
-            src = div.find_element(By.XPATH, ".//div/div/picture/img").get_attribute(
-                "src"
-            )
+            src = div.find_element(By.XPATH, ".//div/div/picture/img").get_attribute("src")
             logging.info("crawled from first exception")
             return src
         except TimeoutException as e:
             logging.info(f"exception at crawling_product_img_url` => {e}")
             return
+
 
 def get_color_tag_list(wait):
     color_table = wait.until(
@@ -457,12 +456,14 @@ def main():
 
     options = Options()
     options.add_experimental_option("excludeSwitches", ["enable-logging"])
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    with webdriver.Chrome(
-        service=Service(ChromeDriverManager().install(), options=options)
-    ) as driver:
+    options.add_argument('--headless')  # GUI를 표시하지 않음
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+
+    service = Service('/usr/local/bin/chromedriver')
+    driver = webdriver.Chrome(service=service, options=options)
+    
+    with driver:
         for category, id in category_ids.items():
             print(category)
             url = products_url.format(id=id)
@@ -493,9 +494,9 @@ def test():
 
     options = Options()
     options.add_argument("--headless")
-    with webdriver.Chrome(
-        service=Service(ChromeDriverManager().install(), options=options)
-    ) as driver:
+    service = Service('/usr/local/bin/chromedriver')
+    driver = webdriver.Chrome(service=service, options=options)
+    with driver:
         all_links = []
         # for category, id in category_ids.items():
         #     url = products_url.format(id=id)
