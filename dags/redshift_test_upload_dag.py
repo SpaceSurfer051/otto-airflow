@@ -5,6 +5,8 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
 import pandas as pd
 import io
+import random
+import string
 
 default_args = {
     'owner': 'airflow',
@@ -13,14 +15,59 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload',
+    'otto_redshift_data_upload_real',
     default_args=default_args,
-    description='Upload data to Redshift with deduplication',
+    description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
 )
 
+# 테이블을 생성하는 함수
+def create_tables():
+    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
+    connection = redshift_hook.get_conn()
+    cursor = connection.cursor()
+    cursor.execute("""
+    CREATE SCHEMA IF NOT EXISTS otto;
+
+    CREATE TABLE IF NOT EXISTS otto.product_table (
+        product_id VARCHAR(256),
+        rank FLOAT,
+        product_name VARCHAR(256) PRIMARY KEY,
+        category VARCHAR(256),
+        price FLOAT,
+        image_url VARCHAR(1024),
+        description VARCHAR(2048),
+        color VARCHAR(256),
+        size VARCHAR(256),
+        platform VARCHAR(256),
+        UNIQUE (product_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS otto.reviews (
+        review_id VARCHAR(256) PRIMARY KEY,
+        product_name VARCHAR(256),
+        color VARCHAR(256),
+        size VARCHAR(256),
+        height INT,
+        gender VARCHAR(16),
+        weight INT,
+        top_size VARCHAR(256),
+        bottom_size VARCHAR(256),
+        size_comment TEXT,
+        quality_comment TEXT,
+        color_comment TEXT,
+        thickness_comment TEXT,
+        brightness_comment TEXT,
+        comment TEXT,
+        FOREIGN KEY (product_name) REFERENCES otto.product_table (product_name)
+    );
+    """)
+    connection.commit()
+    cursor.close()
+    connection.close()
+
 # S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
-def read_s3_to_dataframe(bucket_name, key, **kwargs):
+def read_s3_to_dataframe(bucket_name, key):
     s3_hook = S3Hook(aws_conn_id='aws_default')
     s3_object = s3_hook.get_key(key, bucket_name)
     s3_data = s3_object.get()['Body'].read().decode('utf-8')
@@ -34,6 +81,34 @@ def fetch_product_names():
     connection = redshift_hook.get_conn()
     return pd.read_sql(sql, connection)
 
+# 랜덤으로 고유한 review_id를 생성하는 함수
+def generate_unique_id():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+
+# S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
+def upload_product_data(**kwargs):
+    bucket_name = 'otto-glue'
+    product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
+
+    # S3에서 제품 데이터를 읽음
+    product_df = read_s3_to_dataframe(bucket_name, product_key)
+
+    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
+    connection = redshift_hook.get_conn()
+    cursor = connection.cursor()
+
+    for index, row in product_df.iterrows():
+        cursor.execute("""
+            INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (product_name) DO NOTHING
+            """, tuple(row))
+    
+    connection.commit()
+    cursor.close()
+    connection.close()
+    print(f"Inserted {len(product_df)} rows into otto.product_table")
+
 # S3에서 리뷰 데이터를 읽는 태스크
 def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
@@ -46,14 +121,14 @@ def get_existing_product_names(**kwargs):
     existing_product_names_df = fetch_product_names()
     kwargs['ti'].xcom_push(key='existing_product_names_df', value=existing_product_names_df.to_json())
 
-# 리뷰 데이터를 필터링하고 Redshift에 삽입하는 태스크
+# 리뷰 데이터를 필터링하고 Redshift에 삽입하는 함수
 def process_and_upload_review_data(**kwargs):
     ti = kwargs['ti']
     review_df = pd.read_json(ti.xcom_pull(key='review_df', task_ids='read_review_data'))
     existing_product_names_df = pd.read_json(ti.xcom_pull(key='existing_product_names_df', task_ids='get_existing_product_names'))
 
-    # product_name이 존재하지 않는 리뷰만 필터링
-    new_reviews_df = review_df[~review_df['product_name'].isin(existing_product_names_df['product_name'])]
+    # product_name이 존재하는 리뷰만 필터링
+    new_reviews_df = review_df[review_df['product_name'].isin(existing_product_names_df['product_name'])]
 
     if not new_reviews_df.empty:
         redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
@@ -64,7 +139,8 @@ def process_and_upload_review_data(**kwargs):
             cursor.execute("""
                 INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, tuple(row))
+                ON CONFLICT (review_id) DO NOTHING
+                """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
         
         connection.commit()
         cursor.close()
@@ -72,6 +148,19 @@ def process_and_upload_review_data(**kwargs):
         print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
 
 # 태스크 정의
+create_tables_task = PythonOperator(
+    task_id='create_tables',
+    python_callable=create_tables,
+    dag=dag,
+)
+
+upload_product_data_task = PythonOperator(
+    task_id='upload_product_data',
+    python_callable=upload_product_data,
+    provide_context=True,
+    dag=dag,
+)
+
 read_review_data_task = PythonOperator(
     task_id='read_review_data',
     python_callable=read_review_data,
@@ -94,4 +183,4 @@ process_and_upload_review_data_task = PythonOperator(
 )
 
 # 태스크 순서 정의
-read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
+create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
