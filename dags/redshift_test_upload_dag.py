@@ -220,5 +220,5 @@ identify_max_lengths_task = PythonOperator(
     dag=dag,
 )
 
-# 태스크 순서 정의
+# 태스크 순서 정의 테스트
 create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> identify_max_lengths_task >> process_and_upload_review_data_task
