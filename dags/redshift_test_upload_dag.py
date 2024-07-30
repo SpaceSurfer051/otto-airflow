@@ -32,13 +32,14 @@ def create_schema():
     connection.close()
 
 # 테이블을 생성하는 함수
+# 테이블을 생성하는 함수
 def create_tables():
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
     connection = redshift_hook.get_conn()
     cursor = connection.cursor()
     cursor.execute("""
-    DROP TABLE IF EXISTS otto.product_table;
-    DROP TABLE IF EXISTS otto.reviews;
+    DROP TABLE IF EXISTS otto.reviews CASCADE;
+    DROP TABLE IF EXISTS otto.product_table CASCADE;
 
     CREATE TABLE otto.product_table (
         product_id VARCHAR(256),
@@ -76,6 +77,7 @@ def create_tables():
     connection.commit()
     cursor.close()
     connection.close()
+
 
 # S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
 def read_s3_to_dataframe(bucket_name, key):
