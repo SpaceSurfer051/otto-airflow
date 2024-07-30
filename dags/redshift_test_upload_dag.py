@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_6',
+    'otto_redshift_data_upload_real_7',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -41,29 +41,29 @@ def create_tables():
     DROP TABLE IF EXISTS otto.product_table CASCADE;
 
     CREATE TABLE otto.product_table (
-        product_id VARCHAR(256),
+        product_id VARCHAR(512),
         rank FLOAT,
-        product_name VARCHAR(256) PRIMARY KEY,
-        category VARCHAR(256),
+        product_name VARCHAR(512) PRIMARY KEY,
+        category VARCHAR(512),
         price FLOAT,
         image_url VARCHAR(1024),
         description VARCHAR(2048),
-        color VARCHAR(256),
-        size VARCHAR(256),
-        platform VARCHAR(256),
+        color VARCHAR(512),
+        size VARCHAR(512),
+        platform VARCHAR(512),
         UNIQUE (product_name)
     );
 
     CREATE TABLE otto.reviews (
-        review_id VARCHAR(256) PRIMARY KEY,
-        product_name VARCHAR(256),
-        color VARCHAR(256),
-        size VARCHAR(256),
+        review_id VARCHAR(512) PRIMARY KEY,
+        product_name VARCHAR(512),
+        color VARCHAR(512),
+        size VARCHAR(512),
         height VARCHAR(16),
         gender VARCHAR(16),
         weight VARCHAR(16),
-        top_size VARCHAR(256),
-        bottom_size VARCHAR(256),
+        top_size VARCHAR(512),
+        bottom_size VARCHAR(512),
         size_comment TEXT,
         quality_comment TEXT,
         color_comment TEXT,
