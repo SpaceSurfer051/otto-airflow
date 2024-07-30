@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_2',
+    'otto_redshift_data_upload_real_3',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -42,7 +42,7 @@ def create_tables():
         rank FLOAT,
         product_name VARCHAR(256) PRIMARY KEY,
         category VARCHAR(256),
-        price FLOAT,
+        price VARCHAR(256),
         image_url VARCHAR(1024),
         description VARCHAR(2048),
         color VARCHAR(256),
