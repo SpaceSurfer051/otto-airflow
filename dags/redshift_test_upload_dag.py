@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_4',
+    'otto_redshift_data_upload_real_5',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -59,9 +59,9 @@ def create_tables():
         product_name VARCHAR(256),
         color VARCHAR(256),
         size VARCHAR(256),
-        height VARCHAR(256),
-        gender VARCHAR(256),
-        weight VARCHAR(256),
+        height VARCHAR(16),
+        gender VARCHAR(16),
+        weight VARCHAR(16),
         top_size VARCHAR(256),
         bottom_size VARCHAR(256),
         size_comment TEXT,
@@ -76,7 +76,6 @@ def create_tables():
     connection.commit()
     cursor.close()
     connection.close()
-
 
 # S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
 def read_s3_to_dataframe(bucket_name, key):
@@ -157,12 +156,21 @@ def process_and_upload_review_data(**kwargs):
                 cursor.execute("""
                     INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'] if row['height'] != 'none' else None, row['gender'], row['weight'] if row['weight'] != 'none' else None, row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
+                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
         
         connection.commit()
         cursor.close()
         connection.close()
         print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
+
+# 각 열의 최대 길이를 식별하는 함수
+def identify_max_lengths(**kwargs):
+    bucket_name = 'otto-glue'
+    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
+    review_df = read_s3_to_dataframe(bucket_name, review_key)
+    max_lengths = review_df.applymap(lambda x: len(str(x)) if pd.notnull(x) else 0).max()
+    print("Max lengths of each column:")
+    print(max_lengths)
 
 # 태스크 정의
 create_schema_task = PythonOperator(
@@ -205,5 +213,12 @@ process_and_upload_review_data_task = PythonOperator(
     dag=dag,
 )
 
+identify_max_lengths_task = PythonOperator(
+    task_id='identify_max_lengths',
+    python_callable=identify_max_lengths,
+    provide_context=True,
+    dag=dag,
+)
+
 # 태스크 순서 정의
-create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
+create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> identify_max_lengths_task >> process_and_upload_review_data_task
