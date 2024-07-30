@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_3',
+    'otto_redshift_data_upload_real_4',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -31,7 +31,6 @@ def create_schema():
     cursor.close()
     connection.close()
 
-# 테이블을 생성하는 함수
 # 테이블을 생성하는 함수
 def create_tables():
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
@@ -60,9 +59,9 @@ def create_tables():
         product_name VARCHAR(256),
         color VARCHAR(256),
         size VARCHAR(256),
-        height VARCHAR(16),
-        gender VARCHAR(16),
-        weight VARCHAR(16),
+        height VARCHAR(256),
+        gender VARCHAR(256),
+        weight VARCHAR(256),
         top_size VARCHAR(256),
         bottom_size VARCHAR(256),
         size_comment TEXT,
