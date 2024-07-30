@@ -1,9 +1,10 @@
 from airflow import DAG
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
 from airflow.operators.python import PythonOperator
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
-import logging
+import pandas as pd
+import io
 
 default_args = {
     'owner': 'airflow',
@@ -12,64 +13,85 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_test',
+    'otto_redshift_data_upload',
     default_args=default_args,
-    description='Test Redshift schema and table creation',
+    description='Upload data to Redshift with deduplication',
     schedule_interval=None,
 )
 
-# Task to create schema
-create_schema = SQLExecuteQueryOperator(
-    task_id='create_schema',
-    conn_id='otto_redshift',
-    sql="""
-    CREATE SCHEMA IF NOT EXISTS otto;
-    """,
+# S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
+def read_s3_to_dataframe(bucket_name, key, **kwargs):
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    s3_object = s3_hook.get_key(key, bucket_name)
+    s3_data = s3_object.get()['Body'].read().decode('utf-8')
+    data = pd.read_csv(io.StringIO(s3_data))
+    return data
+
+# 데이터베이스에 연결하여 데이터프레임으로 변환하는 함수
+def fetch_product_names():
+    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
+    sql = "SELECT product_name FROM otto.product_table"
+    connection = redshift_hook.get_conn()
+    return pd.read_sql(sql, connection)
+
+# S3에서 리뷰 데이터를 읽는 태스크
+def read_review_data(**kwargs):
+    bucket_name = 'otto-glue'
+    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
+    review_df = read_s3_to_dataframe(bucket_name, review_key)
+    kwargs['ti'].xcom_push(key='review_df', value=review_df.to_json())
+
+# Redshift에서 product_name 목록을 가져오는 태스크
+def get_existing_product_names(**kwargs):
+    existing_product_names_df = fetch_product_names()
+    kwargs['ti'].xcom_push(key='existing_product_names_df', value=existing_product_names_df.to_json())
+
+# 리뷰 데이터를 필터링하고 Redshift에 삽입하는 태스크
+def process_and_upload_review_data(**kwargs):
+    ti = kwargs['ti']
+    review_df = pd.read_json(ti.xcom_pull(key='review_df', task_ids='read_review_data'))
+    existing_product_names_df = pd.read_json(ti.xcom_pull(key='existing_product_names_df', task_ids='get_existing_product_names'))
+
+    # product_name이 존재하지 않는 리뷰만 필터링
+    new_reviews_df = review_df[~review_df['product_name'].isin(existing_product_names_df['product_name'])]
+
+    if not new_reviews_df.empty:
+        redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
+        connection = redshift_hook.get_conn()
+        cursor = connection.cursor()
+
+        for index, row in new_reviews_df.iterrows():
+            cursor.execute("""
+                INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, tuple(row))
+        
+        connection.commit()
+        cursor.close()
+        connection.close()
+        print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
+
+# 태스크 정의
+read_review_data_task = PythonOperator(
+    task_id='read_review_data',
+    python_callable=read_review_data,
+    provide_context=True,
     dag=dag,
 )
 
-# Task to create table
-create_table = SQLExecuteQueryOperator(
-    task_id='create_table',
-    conn_id='otto_redshift',
-    sql="""
-    DROP TABLE IF EXISTS otto.test_raw_data_table;
-    CREATE TABLE otto.test_raw_data_table (
-        product_id VARCHAR(256),
-        rank INTEGER,
-        product_name VARCHAR(256),
-        category VARCHAR(256),
-        price FLOAT,
-        image_url VARCHAR(1024),
-        description VARCHAR(2048),
-        color VARCHAR(256),
-        size VARCHAR(256)
-    );
-    """,
+get_existing_product_names_task = PythonOperator(
+    task_id='get_existing_product_names',
+    python_callable=get_existing_product_names,
+    provide_context=True,
     dag=dag,
 )
 
-# Python function to check if schema and table are created successfully
-def check_creation():
-    logging.info("Schema and Table creation successful")
-
-check_creation_task = PythonOperator(
-    task_id='check_creation',
-    python_callable=check_creation,
+process_and_upload_review_data_task = PythonOperator(
+    task_id='process_and_upload_review_data',
+    python_callable=process_and_upload_review_data,
+    provide_context=True,
     dag=dag,
 )
 
-# Task to load data from S3 to Redshift
-load_s3_to_redshift = S3ToRedshiftOperator(
-    task_id='load_s3_to_redshift',
-    s3_bucket='otto-glue',
-    s3_key='integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv',
-    schema='otto',
-    table='test_raw_data_table',
-    copy_options=['csv', 'IGNOREHEADER 1'],
-    aws_conn_id='aws_default',
-    redshift_conn_id='otto_redshift',
-    dag=dag,
-)
-
-create_schema >> create_table >> check_creation_task >> load_s3_to_redshift
+# 태스크 순서 정의
+read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
