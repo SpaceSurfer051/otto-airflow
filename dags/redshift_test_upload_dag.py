@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_8',
+    'otto_redshift_data_upload_real_9',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -40,21 +40,21 @@ def create_tables():
     DROP TABLE IF EXISTS otto.reviews CASCADE;
     DROP TABLE IF EXISTS otto.product_table CASCADE;
 
-    CREATE TABLE otto.product_table (
-        product_id VARCHAR(512),
+    CREATE TABLE IF NOT EXISTS otto.product_table (
+        product_id VARCHAR(256),
         rank FLOAT,
-        product_name VARCHAR(512) PRIMARY KEY,
-        category VARCHAR(512),
+        product_name TEXT PRIMARY KEY,
+        category VARCHAR(256),
         price FLOAT,
         image_url VARCHAR(1024),
-        description VARCHAR(2048),
-        color VARCHAR(512),
-        size VARCHAR(512),
-        platform VARCHAR(512),
+        description TEXT,
+        color TEXT,
+        size TEXT,
+        platform VARCHAR(256),
         UNIQUE (product_name)
     );
 
-    CREATE TABLE otto.reviews (
+    CREATE TABLE IF NOT EXISTS otto.reviews (
         review_id VARCHAR(256) PRIMARY KEY,
         product_name TEXT,
         color TEXT,
@@ -71,13 +71,12 @@ def create_tables():
         brightness_comment TEXT,
         comment TEXT,
         FOREIGN KEY (product_name) REFERENCES otto.product_table (product_name)
-);
-
     );
     """)
     connection.commit()
     cursor.close()
     connection.close()
+
 
 # S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
 def read_s3_to_dataframe(bucket_name, key):
