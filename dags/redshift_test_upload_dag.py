@@ -1,7 +1,6 @@
 from airflow import DAG
-from airflow.providers.postgres.operators.postgres import PostgresOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 import logging
@@ -20,9 +19,9 @@ dag = DAG(
 )
 
 # Task to create schema
-create_schema = PostgresOperator(
+create_schema = SQLExecuteQueryOperator(
     task_id='create_schema',
-    postgres_conn_id='otto_redshift',
+    conn_id='otto_redshift',
     sql="""
     CREATE SCHEMA IF NOT EXISTS otto;
     """,
@@ -30,9 +29,9 @@ create_schema = PostgresOperator(
 )
 
 # Task to create table
-create_table = PostgresOperator(
+create_table = SQLExecuteQueryOperator(
     task_id='create_table',
-    postgres_conn_id='otto_redshift',
+    conn_id='otto_redshift',
     sql="""
     DROP TABLE IF EXISTS otto.test_raw_data_table;
     CREATE TABLE otto.test_raw_data_table (
