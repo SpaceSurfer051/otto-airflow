@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_7',
+    'otto_redshift_data_upload_real_8',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -55,15 +55,15 @@ def create_tables():
     );
 
     CREATE TABLE otto.reviews (
-        review_id VARCHAR(512) PRIMARY KEY,
-        product_name VARCHAR(512),
-        color VARCHAR(512),
-        size VARCHAR(512),
+        review_id VARCHAR(256) PRIMARY KEY,
+        product_name TEXT,
+        color TEXT,
+        size TEXT,
         height VARCHAR(16),
         gender VARCHAR(16),
         weight VARCHAR(16),
-        top_size VARCHAR(512),
-        bottom_size VARCHAR(512),
+        top_size TEXT,
+        bottom_size TEXT,
         size_comment TEXT,
         quality_comment TEXT,
         color_comment TEXT,
@@ -71,6 +71,8 @@ def create_tables():
         brightness_comment TEXT,
         comment TEXT,
         FOREIGN KEY (product_name) REFERENCES otto.product_table (product_name)
+);
+
     );
     """)
     connection.commit()
