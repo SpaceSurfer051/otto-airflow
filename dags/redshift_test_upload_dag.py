@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_5',
+    'otto_redshift_data_upload_real_6',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
