@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real',
+    'otto_redshift_data_upload_real_2',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -106,11 +106,13 @@ def upload_product_data(**kwargs):
     cursor = connection.cursor()
 
     for index, row in product_df.iterrows():
-        cursor.execute("""
-            INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (product_name) DO NOTHING
-            """, tuple(row))
+        cursor.execute("SELECT 1 FROM otto.product_table WHERE product_name = %s", (row['product_name'],))
+        exists = cursor.fetchone()
+        if not exists:
+            cursor.execute("""
+                INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, tuple(row))
     
     connection.commit()
     cursor.close()
@@ -144,11 +146,13 @@ def process_and_upload_review_data(**kwargs):
         cursor = connection.cursor()
 
         for index, row in new_reviews_df.iterrows():
-            cursor.execute("""
-                INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (review_id) DO NOTHING
-                """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
+            cursor.execute("SELECT 1 FROM otto.reviews WHERE review_id = %s", (generate_unique_id(),))
+            exists = cursor.fetchone()
+            if not exists:
+                cursor.execute("""
+                    INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
         
         connection.commit()
         cursor.close()
