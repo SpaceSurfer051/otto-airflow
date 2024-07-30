@@ -21,14 +21,22 @@ dag = DAG(
     schedule_interval=None,
 )
 
+# 스키마를 생성하는 함수
+def create_schema():
+    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
+    connection = redshift_hook.get_conn()
+    cursor = connection.cursor()
+    cursor.execute("CREATE SCHEMA IF NOT EXISTS otto;")
+    connection.commit()
+    cursor.close()
+    connection.close()
+
 # 테이블을 생성하는 함수
 def create_tables():
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
     connection = redshift_hook.get_conn()
     cursor = connection.cursor()
     cursor.execute("""
-    CREATE SCHEMA IF NOT EXISTS otto;
-
     CREATE TABLE IF NOT EXISTS otto.product_table (
         product_id VARCHAR(256),
         rank FLOAT,
@@ -148,6 +156,12 @@ def process_and_upload_review_data(**kwargs):
         print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
 
 # 태스크 정의
+create_schema_task = PythonOperator(
+    task_id='create_schema',
+    python_callable=create_schema,
+    dag=dag,
+)
+
 create_tables_task = PythonOperator(
     task_id='create_tables',
     python_callable=create_tables,
@@ -183,4 +197,4 @@ process_and_upload_review_data_task = PythonOperator(
 )
 
 # 태스크 순서 정의
-create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
+create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> process_and_upload_review_data_task
