@@ -37,7 +37,10 @@ def create_tables():
     connection = redshift_hook.get_conn()
     cursor = connection.cursor()
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS otto.product_table (
+    DROP TABLE IF EXISTS otto.product_table;
+    DROP TABLE IF EXISTS otto.reviews;
+
+    CREATE TABLE otto.product_table (
         product_id VARCHAR(256),
         rank FLOAT,
         product_name VARCHAR(256) PRIMARY KEY,
@@ -51,14 +54,14 @@ def create_tables():
         UNIQUE (product_name)
     );
 
-    CREATE TABLE IF NOT EXISTS otto.reviews (
+    CREATE TABLE otto.reviews (
         review_id VARCHAR(256) PRIMARY KEY,
         product_name VARCHAR(256),
         color VARCHAR(256),
         size VARCHAR(256),
-        height INT,
+        height VARCHAR(16),
         gender VARCHAR(16),
-        weight INT,
+        weight VARCHAR(16),
         top_size VARCHAR(256),
         bottom_size VARCHAR(256),
         size_comment TEXT,
@@ -153,7 +156,7 @@ def process_and_upload_review_data(**kwargs):
                 cursor.execute("""
                     INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
+                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'] if row['height'] != 'none' else None, row['gender'], row['weight'] if row['weight'] != 'none' else None, row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
         
         connection.commit()
         cursor.close()
