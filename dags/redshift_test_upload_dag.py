@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    'otto_redshift_data_upload_real_21',
+    'otto_redshift_data_upload_real_21_1',
     default_args=default_args,
     description='Upload product and review data to Redshift with deduplication',
     schedule_interval=None,
@@ -69,7 +69,7 @@ def create_tables():
         color_comment TEXT,
         thickness_comment TEXT,
         brightness_comment TEXT,
-        comment TEXT,
+        comment varchar(max),
         FOREIGN KEY (product_name) REFERENCES otto.product_table (product_name)
     );
     """)
