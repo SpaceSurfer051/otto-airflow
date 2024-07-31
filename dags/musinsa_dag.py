@@ -51,7 +51,7 @@ default_args = {
 
 # DAG 설정
 dag = DAG(
-    "all_update_dag",
+    "all_update_dag_v2",
     default_args=default_args,
     description="DAG to crawl and compare links, then add size and color information",
     schedule_interval=timedelta(days=1),
