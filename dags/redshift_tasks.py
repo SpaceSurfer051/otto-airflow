@@ -87,22 +87,26 @@ def fetch_product_names():
 def generate_unique_id():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
+# S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
     product_key_prefix = 'integrated-data/products/'
     fallback_product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
 
     try:
+        # S3에서 최신 제품 데이터를 가져옴
         latest_product_key = get_latest_s3_key(bucket_name, product_key_prefix)
         if not latest_product_key:
             raise FileNotFoundError("No latest product key found, using fallback.")
         
         product_df = read_s3_to_dataframe(bucket_name, latest_product_key)
     except Exception as e:
+        # 예외 발생 시 fallback key 사용
         print(f"Error fetching latest product key: {e}. Using fallback key.")
         product_df = read_s3_to_dataframe(bucket_name, fallback_product_key)
 
-    product_df['price'] = product_df['price'].str.replace(',', '').astype(float)
+    product_df['price'] = product_df['price'].str.replace(',', '').astype(float)  # 쉼표 제거 및 float 변환
+    product_df['rank'] = product_df['rank'].replace('none', 0.0).astype(float)  # 'none'을 0.0으로 변환
 
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
     connection = redshift_hook.get_conn()
@@ -121,6 +125,7 @@ def upload_product_data(**kwargs):
     cursor.close()
     connection.close()
     print(f"Inserted {len(product_df)} rows into otto.product_table")
+
 
 def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
