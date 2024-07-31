@@ -59,17 +59,6 @@ def create_tables():
     cursor.close()
     connection.close()
 
-def get_latest_s3_key(bucket_name, prefix):
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    s3_client = s3_hook.get_conn()
-    
-    response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
-    
-    if 'Contents' in response:
-        sorted_objects = sorted(response['Contents'], key=lambda obj: obj['LastModified'], reverse=True)
-        return sorted_objects[0]['Key']
-    else:
-        return None
 
 def read_s3_to_dataframe(bucket_name, key):
     s3_hook = S3Hook(aws_conn_id='aws_default')
@@ -90,20 +79,9 @@ def generate_unique_id():
 # S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
-    product_key_prefix = 'integrated-data/products/'
-    fallback_product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
+    product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
 
-    try:
-        # S3에서 최신 제품 데이터를 가져옴
-        latest_product_key = get_latest_s3_key(bucket_name, product_key_prefix)
-        if not latest_product_key:
-            raise FileNotFoundError("No latest product key found, using fallback.")
-        
-        product_df = read_s3_to_dataframe(bucket_name, latest_product_key)
-    except Exception as e:
-        # 예외 발생 시 fallback key 사용
-        print(f"Error fetching latest product key: {e}. Using fallback key.")
-        product_df = read_s3_to_dataframe(bucket_name, fallback_product_key)
+    product_df = read_s3_to_dataframe(bucket_name, product_key)
 
     product_df['price'] = product_df['price'].str.replace(',', '').astype(float)  # 쉼표 제거 및 float 변환
     product_df['rank'] = product_df['rank'].replace('none', 0.0).astype(float)  # 'none'을 0.0으로 변환
@@ -129,18 +107,8 @@ def upload_product_data(**kwargs):
 
 def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
-    review_key_prefix = 'integrated-data/reviews/'
-    fallback_review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
-
-    try:
-        latest_review_key = get_latest_s3_key(bucket_name, review_key_prefix)
-        if not latest_review_key:
-            raise FileNotFoundError("No latest review key found, using fallback.")
-        
-        review_df = read_s3_to_dataframe(bucket_name, latest_review_key)
-    except Exception as e:
-        print(f"Error fetching latest review key: {e}. Using fallback key.")
-        review_df = read_s3_to_dataframe(bucket_name, fallback_review_key)
+    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
+    review_df = read_s3_to_dataframe(bucket_name, review_key)
 
     kwargs['ti'].xcom_push(key='review_df', value=review_df.to_json())
 
