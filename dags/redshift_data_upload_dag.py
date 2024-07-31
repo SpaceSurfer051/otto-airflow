@@ -64,6 +64,12 @@ identify_max_lengths_task = PythonOperator(
     dag=dag,
 )
 
+create_rds_tables_task = PythonOperator(
+    task_id='create_rds_tables',
+    python_callable=rds_tasks.create_rds_tables,
+    dag=dag,
+)
+
 transfer_data_to_rds_task = PythonOperator(
     task_id='transfer_data_to_rds',
     python_callable=rds_tasks.transfer_data_to_rds,
@@ -71,4 +77,4 @@ transfer_data_to_rds_task = PythonOperator(
     dag=dag,
 )
 
-create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> identify_max_lengths_task >> process_and_upload_review_data_task >> transfer_data_to_rds_task
+create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> identify_max_lengths_task >> process_and_upload_review_data_task >> create_rds_tables_task >> transfer_data_to_rds_task
