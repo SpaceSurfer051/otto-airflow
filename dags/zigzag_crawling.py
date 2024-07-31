@@ -76,11 +76,18 @@ def get_csv_from_s3(bucket_name, key):
 
 # 데이터프레임을 S3에 저장하는 함수
 def save_df_to_s3(df, bucket_name, key):
+    # 리스트 타입의 열을 문자열로 변환
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            if any(isinstance(i, list) for i in df[col]):
+                df[col] = df[col].apply(lambda x: ','.join(map(str, x)) if isinstance(x, list) else x)
+                
     df = df.drop_duplicates()  # 중복 제거
     csv_buffer = StringIO()
     df.to_csv(csv_buffer, index=False, encoding="utf-8-sig")
     s3_hook = S3Hook(aws_conn_id="aws_s3")
     s3_hook.load_string(csv_buffer.getvalue(), key, bucket_name, replace=True)
+
 
 # 데이터프레임에 순위를 설정하는 함수
 def set_rank(df, sorted_product_list):
