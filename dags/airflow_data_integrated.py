@@ -87,7 +87,7 @@ def integrate_data():
     platform_mapping = {
         '29cm_products.csv': '29cm',
         'processed_products.csv': 'musinsa',
-        'zigzag_products': 'zigzag'
+        'zigzag_products.csv': 'zigzag'
     }
 
     for file_name in product_file_names:
