@@ -126,7 +126,7 @@ def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
 
     prefix_reviews = 'integrated-data/reviews/'
-    #s3_hook = S3Hook(aws_conn_id='aws_default')       
+    s3_hook = S3Hook(aws_conn_id='aws_default')       
     files_reviews = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_reviews) 
     review_key = files_reviews[-1]       
     print(review_key)

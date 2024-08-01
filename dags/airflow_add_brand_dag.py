@@ -55,3 +55,5 @@ from webdriver_manager.chrome import ChromeDriverManager
             
         # 이 것들이 끝나면 이 old_product_df를 s3에 최종/combined_products_add_brand.csv에 추가.
 
+
+    # new_product_df로 저장이 된 경우(파일이 존재하는 경우)
