@@ -13,16 +13,16 @@ def create_rds_tables():
     DROP TABLE IF EXISTS otto.product_table CASCADE;
     
     CREATE TABLE IF NOT EXISTS otto.product_table (
-        product_id varchar(max),
+        product_id varchar(1024),
         rank FLOAT,
-        product_name varchar(max) PRIMARY KEY,
-        category varchar(max),
+        product_name varchar(1024) PRIMARY KEY,
+        category varchar(1024),
         price FLOAT,
-        image_url varchar(max),
-        description varchar(max),
-        color varchar(max),
-        size varchar(max),
-        platform varchar(max),
+        image_url varchar(1024),
+        description varchar(1024),
+        color varchar(1024),
+        size varchar(1024),
+        platform varchar(1024),
         UNIQUE (product_name)
     );
     
