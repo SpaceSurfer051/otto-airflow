@@ -92,7 +92,8 @@ def upload_product_data(**kwargs):
 
     # S3에서 제품 데이터를 읽음
     product_df = read_s3_to_dataframe(bucket_name, product_key)
-    
+    # rank 열에서 'none' 값을 0으로 변환하고 타입을 float로 변환
+    product_df['rank'] = product_df['rank'].replace('none', 0).astype(float)
     # 가격 데이터 전처리
     try:
         # 쉼표 제거 및 숫자로 변환
