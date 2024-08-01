@@ -5,6 +5,8 @@ from datetime import datetime
 
 def list_product_in_s3(bucket_name, prefix_product,prefix_review):
     s3_hook = S3Hook(aws_conn_id='aws_default')
+    
+    
     files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product)
     files_product2 = files_product[-1]
     print(files_product2)

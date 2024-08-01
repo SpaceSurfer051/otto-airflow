@@ -1,4 +1,5 @@
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 import io
@@ -83,7 +84,15 @@ def generate_unique_id():
 # S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
-    product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
+
+    prefix_product = 'integrated-data/products/'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product) 
+    product_key = files_product[-1]
+    print(product_key) 
+
+
+    #product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
 
     # S3에서 제품 데이터를 읽음
     product_df = read_s3_to_dataframe(bucket_name, product_key)
@@ -110,7 +119,17 @@ def upload_product_data(**kwargs):
 # S3에서 리뷰 데이터를 읽는 태스크
 def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
-    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
+
+    prefix_reviews = 'integrated-data/reviews/'
+    s3_hook = S3Hook(aws_conn_id='aws_default')    
+    
+    files_reviews = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_reviews) 
+    review_key = files_reviews[-1]       
+    print(review_key)
+
+    
+    
+    #review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
     review_df = read_s3_to_dataframe(bucket_name, review_key)
     kwargs['ti'].xcom_push(key='review_df', value=review_df.to_json())
 
