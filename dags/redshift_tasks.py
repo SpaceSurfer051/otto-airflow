@@ -26,9 +26,9 @@ def create_tables():
     DROP TABLE IF EXISTS otto.product_table CASCADE;
 
     CREATE TABLE IF NOT EXISTS otto.product_table (
-        product_id varchar(512),
+        product_id varchar(1024),
         rank FLOAT,
-        product_name varchar(512) PRIMARY KEY,
+        product_name varchar(1024) PRIMARY KEY,
         category TEXT,
         price FLOAT,
         image_url TEXT,
