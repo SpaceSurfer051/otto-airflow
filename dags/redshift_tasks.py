@@ -96,7 +96,9 @@ def upload_product_data(**kwargs):
 
     # S3에서 제품 데이터를 읽음
     product_df = read_s3_to_dataframe(bucket_name, product_key)
+    
     product_df['price'] = product_df['price'].str.replace(',', '').astype(float)  # 쉼표 제거 및 float 변환
+    product_df['price'] = pd.to_numeric(product_df['price'], errors='coerce').fillna(0)
 
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
     connection = redshift_hook.get_conn()
