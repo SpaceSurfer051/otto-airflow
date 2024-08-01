@@ -84,23 +84,22 @@ def generate_unique_id():
 # S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
-    '''
     prefix_product = 'integrated-data/products/'
     s3_hook = S3Hook(aws_conn_id='aws_default')
-    files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product) 
+    files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product)
     product_key = files_product[-1]
-    print(product_key)     
-    '''
-
-
-
-    product_key = 'integrated-data/products/combined_products_2024-07-29 08:38:46.040114.csv'
+    print(product_key)
 
     # S3에서 제품 데이터를 읽음
     product_df = read_s3_to_dataframe(bucket_name, product_key)
     
-    product_df['price'] = product_df['price'].str.replace(',', '').astype(float)  # 쉼표 제거 및 float 변환
-    #product_df['price'] = pd.to_numeric(product_df['price'], errors='coerce').fillna(0)
+    # 가격 데이터 전처리
+    try:
+        # 쉼표 제거 및 숫자로 변환
+        product_df['price'] = product_df['price'].astype(str).str.replace(',', '').astype(float)
+    except Exception as e:
+        print(f"Error processing price column: {e}")
+        product_df['price'] = 9000.0  # 오류 발생 시 기본값으로 9000.0 설정
 
     redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
     connection = redshift_hook.get_conn()
@@ -120,21 +119,21 @@ def upload_product_data(**kwargs):
     connection.close()
     print(f"Inserted {len(product_df)} rows into otto.product_table")
 
+
 # S3에서 리뷰 데이터를 읽는 태스크
 def read_review_data(**kwargs):
     bucket_name = 'otto-glue'
-    '''
+
     prefix_reviews = 'integrated-data/reviews/'
-    s3_hook = S3Hook(aws_conn_id='aws_default')    
-    
+    #s3_hook = S3Hook(aws_conn_id='aws_default')       
     files_reviews = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_reviews) 
     review_key = files_reviews[-1]       
     print(review_key)
-    '''
+
     
     
     
-    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
+    #review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
     review_df = read_s3_to_dataframe(bucket_name, review_key)
     kwargs['ti'].xcom_push(key='review_df', value=review_df.to_json())
 
