@@ -3,11 +3,18 @@ from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.S3_hook import S3Hook
 from datetime import datetime
 
-def list_files_in_s3(bucket_name, prefix):
+def list_product_in_s3(bucket_name, prefix):
     s3_hook = S3Hook(aws_conn_id='aws_default')
-    files = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix)
-    files2 = files[-1]
-    return files2
+    files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix)
+    files_product2 = files_product[-1]
+    print(files_product2)
+    
+    
+    files_review = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix)
+    files_review2 = files_review[-1]
+    print(files_review2)
+    
+    return files_product2
 
 default_args = {
     'owner': 'airflow',
@@ -21,13 +28,13 @@ with DAG('s3_list_files_dag',
         schedule_interval='@once',
         catchup=False) as dag:
 
-    list_files_task = PythonOperator(
+    list_product_in_s3 = PythonOperator(
         task_id='list_files',
-        python_callable=list_files_in_s3,
+        python_callable=list_product_in_s3,
         op_kwargs={
             'bucket_name': 'otto-glue',
             'prefix': 'integrated-data/products/'
         },
     )
 
-    list_files_task
+    list_product_in_s3 
