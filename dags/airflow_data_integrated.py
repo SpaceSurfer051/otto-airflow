@@ -17,12 +17,12 @@ def integrate_data():
     product_file_names = [
         '29cm_products.csv',
         'processed_products.csv',
-        'test_zigzag_product',
+        'zigzag_products.csv',
     ]
     review_file_names = [
         '29cm_reviews.csv',
         'musinsa_reviews.csv',
-        'test_zigzag_reviews',
+        'zigzag_reviews.csv',
     ]
     now = datetime.now()
     combined_reviews_file_key = f'integrated-data/reviews/combined_reviews_{now}.csv'
@@ -87,7 +87,7 @@ def integrate_data():
     platform_mapping = {
         '29cm_products.csv': '29cm',
         'processed_products.csv': 'musinsa',
-        'test_zigzag_product': 'zigzag'
+        'zigzag_products': 'zigzag'
     }
 
     for file_name in product_file_names:
