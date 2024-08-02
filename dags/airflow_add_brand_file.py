@@ -99,7 +99,7 @@ def process_data():
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         driver = webdriver.Chrome(service=service, options=options)
-        visit_url = old_product('description')
+        visit_url = old_product['description']
         
 
         for i in range(len(visit_url)):
