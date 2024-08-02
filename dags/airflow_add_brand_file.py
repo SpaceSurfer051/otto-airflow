@@ -99,14 +99,35 @@ def process_data():
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         driver = webdriver.Chrome(service=service, options=options)
+        wait = WebDriverWait(driver, 10)
         visit_url = old_product['description']
         
 
         for i in range(len(visit_url)):
             URL = visit_url[i]
-            print(URL)
             platform = old_product['platform'][i]
-            print(platform)
-            
+            #print("플랫폼 : ",platform, "사이트", URL)
+            if(platform == 'musinsa'):
+                driver.get(URL)
+                time.sleep(1)
+                for i in range(14,18,1):
+                    try:
+                        brand_musinsa = wait.until(EC.presence_of_element_located((By.XPATH, f'//*[@id="root"]/div[{i}]/div[3]/dl[1]/dd/a'))).text
+                        print(brand_musinsa)
+                    except:
+                        print("다음 부분 탐색")
+                
+            elif(platform == 'zigzag'):
+                print("zigzag임.")
+                time.sleep(1)
+                
+                
+            elif(platform == '29cm'):
+                driver.get(URL)
+                time.sleep(1)
+                brand_29cm = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))).text
+                print(brand_29cm)
+            else:
+                print("end or error")
     old_product_info()
     new_product_info()
