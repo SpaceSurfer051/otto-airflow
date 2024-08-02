@@ -16,6 +16,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
 def process_data():
+    
+    
+    
+    
     ############## s3 정보 가져오는 파트 ############################
 
     # s3에서 최신 product 정보를 가져옴, old_product_df로 저장
@@ -62,7 +66,7 @@ def process_data():
         old_product_key = old_product_file_list[-1]       
         print(old_product_key)
         old_product = info_to_dataframe(bucket_name,old_product_key,prefix_old_product)
-
+        crawling_test(old_product)
 
     # new_product_info, s3에서 리스트를 가져오고 최신 버전 파일 이름 가져오기
     def new_product_info():  
@@ -82,8 +86,21 @@ def process_data():
         except Exception as e:
             logging.error(f"최신 제품 추가 정보를 가져오는 중 오류 발생(테스트임): {e}")
             return pd.DataFrame()
+        
+    
+    #crawling part
+    def crawling_test(old_product):
+        # 컬럼명 product_id	rank	product_name	category	price	image_url	description	color	size	platform
 
-
+        service = Service('/usr/local/bin/chromedriver')
+        options = Options()
+        options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        options.add_argument('--headless')  # GUI를 표시하지 않음
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        driver = webdriver.Chrome(service=service, options=options)
+        visit_url = old_product('description')
+        print(visit_url)
+    
     old_product_info()
     new_product_info()
-
