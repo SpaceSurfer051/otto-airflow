@@ -17,7 +17,7 @@ default_args = {
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v8',
+    'process_brand_info_dag_v2_1',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
