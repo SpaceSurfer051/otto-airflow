@@ -2,7 +2,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from airflow_add_brand_file import process_data  # 모듈에서 함수 import
-import airflow_add_brand_crawling
 from datetime import timedelta
 
 # 기본 설정
@@ -16,7 +15,7 @@ default_args = {
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v1',
+    'process_brand_info_dag_v2',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행

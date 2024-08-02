@@ -100,7 +100,10 @@ def process_data():
         options.add_argument('--disable-dev-shm-usage')
         driver = webdriver.Chrome(service=service, options=options)
         visit_url = old_product('description')
-        print(visit_url)
-    
+        
+
+        for i in range(len(visit_url)):
+            URL = visit_url[i]
+            print(URL)
     old_product_info()
     new_product_info()
