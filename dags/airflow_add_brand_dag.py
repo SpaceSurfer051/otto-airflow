@@ -4,6 +4,14 @@ from airflow.utils.dates import days_ago
 from airflow_add_brand_file import process_data  # 모듈에서 함수 import
 from datetime import timedelta
 
+'''
+패치내역
+v5
+ - musinsa, 29cm에서 브랜드를 긁어오고, print해보게끔 함. zigzag는 나중에 하기.
+
+'''
+
+
 # 기본 설정
 default_args = {
     'owner': 'airflow',
@@ -15,7 +23,7 @@ default_args = {
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v4',
+    'process_brand_info_dag_v5',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
