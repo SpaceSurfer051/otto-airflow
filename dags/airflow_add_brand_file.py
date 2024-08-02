@@ -16,7 +16,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
 def process_data():
-    
+    brand_info = []
     
     
     
@@ -106,28 +106,61 @@ def process_data():
         for i in range(len(visit_url)):
             URL = visit_url[i]
             platform = old_product['platform'][i]
-            #print("플랫폼 : ",platform, "사이트", URL)
-            if(platform == 'musinsa'):
+            
+            if platform == 'musinsa':
                 driver.get(URL)
-                time.sleep(1)
-                for i in range(14,18,1):
+                time.sleep(1)  # 페이지 로드를 위한 대기 시간
+
+                # 무신사 플랫폼의 XPATH 탐색
+                for j in range(12, 18):
                     try:
-                        brand_musinsa = wait.until(EC.presence_of_element_located((By.XPATH, f'//*[@id="root"]/div[{i}]/div[3]/dl[1]/dd/a'))).text
-                        print(brand_musinsa)
-                    except:
-                        print("다음 부분 탐색")
-                
-            elif(platform == 'zigzag'):
-                print("zigzag임.")
-                time.sleep(1)
-                
-                
-            elif(platform == '29cm'):
+                        # 요소가 나타날 때까지 대기 후, 텍스트 추출
+                        brand_musinsa = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, f'//*[@id="root"]/div[{j}]/div[3]/dl[1]/dd/a'))
+                        ).text
+                        print(brand_musinsa, platform)
+                        brand_info.append(brand_musinsa)
+                    except (NoSuchElementException, TimeoutException):
+                        # 요소가 없거나 대기 시간이 초과된 경우 "none" 추가
+                        print("브랜드 정보 없음")
+                        brand_info.append("none")
+                    except Exception as e:
+                        # 다른 모든 예외에 대해 "none" 추가
+                        print(f"예상치 못한 오류 발생: {str(e)}")
+                        brand_info.append("none")
+                        
+            elif platform == '29cm':
                 driver.get(URL)
-                time.sleep(1)
-                brand_29cm = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))).text
-                print(brand_29cm)
-            else:
-                print("end or error")
+                time.sleep(1)  # 페이지 로드를 위한 대기 시간
+
+                try:
+                    # 29cm 플랫폼의 XPATH 탐색
+                    brand_29cm = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))
+                    ).text
+                    print(brand_29cm, platform)
+                    brand_info.append(brand_29cm)
+                except (NoSuchElementException, TimeoutException):
+                    # 요소가 없거나 대기 시간이 초과된 경우 "none" 추가
+                    print("브랜드 정보 없음")
+                    brand_info.append("none")
+                except Exception as e:
+                    # 다른 모든 예외에 대해 "none" 추가
+                    print(f"예상치 못한 오류 발생: {str(e)}")
+                    brand_info.append("none")
+
+            elif platform == 'zigzag':
+                print("test, zigzag")
+                brand_info.append("test_zigzag")
+
+    def combind_brand_old_product(old_product,brand_info):
+        # old_product와 brand_info의 길이를 비교
+        old_product_length,brand_info_length = len(old_product),len(brand_info)
+        if(old_product_length == brand_info_length):
+            print("값 일치")
+        # 길이가 일치하는지부터 확인.
+        
+    
+    
     old_product_info()
     new_product_info()

@@ -9,6 +9,12 @@ from datetime import timedelta
 v5
  - musinsa, 29cm에서 브랜드를 긁어오고, print해보게끔 함. zigzag는 나중에 하기.
 
+
+v6
+ - musinsa에서 예외가 되는 부분을 발견함 이 부분을 수정함.
+ - 29cm에서 예외처리를 추가해줬음.
+ - musinsa와 29cm에서 예외처리를 추가해줬음.
+ - 결합 전 old_product와 brand_info 길이가 같아야 추가할 수 있음. 그러니 길이가 같은지 테스트부터 진행.
 '''
 
 
@@ -23,7 +29,7 @@ default_args = {
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v5',
+    'process_brand_info_dag_v6',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
