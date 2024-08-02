@@ -105,5 +105,8 @@ def process_data():
         for i in range(len(visit_url)):
             URL = visit_url[i]
             print(URL)
+            platform = old_product['platform'][i]
+            print(platform)
+            
     old_product_info()
     new_product_info()
