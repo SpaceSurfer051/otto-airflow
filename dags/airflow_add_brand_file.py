@@ -21,24 +21,14 @@ def process_data():
     
     
     ############## s3 정보 가져오는 파트 ############################
-
     # s3에서 최신 product 정보를 가져옴, old_product_df로 저장
-
     # s3에서 최신 product_add_brand 정보를 가져옴, 존재하는 경우 new_product_df로 저장, 존재하지 않는 경우 반환 값은 empty dataframe
-
     # 반환 값이 empty인 경우(아예 없는 경우), 전체 데이터 프레임을 가져옴
-
     # 새로운 columns brand를 추가.
-
     # pltform이 29cm 인 경우, columns에 brand 추가하고, brand를 이 컬럼에 추가
-
     # platform이 무신사인 경우, columns에 brand에 추가하고, brand를 이 컬럼에 추가
-
     # platform이 zigzag인 경우, colums에 brand에 추가하고, brand를 이 컬럼에 추가
-
     # 이 것들이 끝나면 이 old_product_df를 s3에 brand/combined_products_add_brand.csv에 추가.
-
-
     # new_product_df로 저장이 된 경우(파일이 존재하는 경우)
 
     def info_to_dataframe(bucket_name,file_key,prefix):
@@ -99,7 +89,7 @@ def process_data():
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         driver = webdriver.Chrome(service=service, options=options)
-        wait = WebDriverWait(driver, 10)
+        wait = WebDriverWait(driver, 5)
         visit_url = old_product['description']
         
 
@@ -140,7 +130,7 @@ def process_data():
 
                 try:
                     # 29cm 플랫폼의 XPATH 탐색
-                    brand_29cm = WebDriverWait(driver, 10).until(
+                    brand_29cm = WebDriverWait(driver, 5).until(
                         EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))
                     ).text
                     print(brand_29cm, platform)
@@ -157,16 +147,50 @@ def process_data():
             elif platform == 'zigzag':
                 print("test, zigzag")
                 brand_info.append("test_zigzag")
+                try:
+                    brand_zigzag = WebDriverWait(driver, 5).until(
+                        EC.presence_of_all_elements_located(By.XPATH, '//*[@id="__next"]/div[1]/div/div/div[2]/div/button/span')).text
+                    print(brand_zigzag, platform)
+                    brand_info(brand_zigzag)
+                except (NoSuchElementException, TimeoutException):
+                    print("브랜드 정보 X")
+                    brand_info.append("none")
+                except Exception as e:
+                    print(f"예상치 못한 오류 발생: {str(e)}")
+                    brand_info.append('none')
+                
+                
         combind_brand_old_product(old_product, brand_info)
         
     def combind_brand_old_product(old_product,brand_inf):
         # old_product와 brand_info의 길이를 비교
         old_product_length,brand_info_length = len(old_product),len(brand_inf)
-        if(old_product_length == brand_info_length):
-            print("값 일치")
         # 길이가 일치하는지부터 확인.
+        if old_product_length == brand_info_length:
+            print("값 일치")
+            # 값이 일치하면, old_product에 새로운 컬럼의 값을 brand_info로 추가
+            old_product['brand'] = brand_info
+
+            # DataFrame을 CSV 형식으로 변환
+            csv_buffer = io.StringIO()
+            old_product.to_csv(csv_buffer, index=False)
+
+            # S3에 CSV 파일 업로드
+            bucket_name = 'otto-glue'
+            s3_key = 'integrated-data/brand/test_brand_info.csv'
+            s3_hook = S3Hook(aws_conn_id='aws_default')
+            s3_hook.load_string(
+                csv_buffer.getvalue(),
+                key=s3_key,
+                bucket_name=bucket_name,
+                replace=True
+            )
+            print(f"{s3_key}로 S3에 성공적으로 업로드되었습니다.")
+        else:
+            print("결합 실패, 길이 불일치.")
+
         
-    
-    
+        
+        
     old_product_info()
     new_product_info()
