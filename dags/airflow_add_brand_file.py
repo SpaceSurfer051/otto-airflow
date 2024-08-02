@@ -111,23 +111,28 @@ def process_data():
                 driver.get(URL)
                 time.sleep(1)  # 페이지 로드를 위한 대기 시간
 
-                # 무신사 플랫폼의 XPATH 탐색
-                for j in range(12, 18):
+                # 무신사 플랫폼의 다양한 XPATH를 순회하여 브랜드 정보 수집
+                brand_found = False
+                for j in range(12, 18):  # XPATH의 특정 범위 설정
                     try:
-                        # 요소가 나타날 때까지 대기 후, 텍스트 추출
-                        brand_musinsa = WebDriverWait(driver, 10).until(
+                        # 요소가 나타날 때까지 대기 후 텍스트 추출
+                        brand_musinsa = wait.until(
                             EC.presence_of_element_located((By.XPATH, f'//*[@id="root"]/div[{j}]/div[3]/dl[1]/dd/a'))
                         ).text
-                        print(brand_musinsa, platform)
+                        print(f"브랜드: {brand_musinsa}, 플랫폼: {platform}")
                         brand_info.append(brand_musinsa)
+                        brand_found = True
+                        break  # 요소를 찾으면 반복 종료
                     except (NoSuchElementException, TimeoutException):
-                        # 요소가 없거나 대기 시간이 초과된 경우 "none" 추가
-                        print("브랜드 정보 없음")
-                        brand_info.append("none")
+                        continue  # 요소가 없거나 대기 시간이 초과되면 다음 XPATH로 이동
                     except Exception as e:
-                        # 다른 모든 예외에 대해 "none" 추가
                         print(f"예상치 못한 오류 발생: {str(e)}")
-                        brand_info.append("none")
+                        continue
+
+                if not brand_found:
+                    # XPATH 중 어떤 요소도 발견되지 않은 경우 "none" 추가
+                    print("브랜드 정보 없음")
+                    brand_info.append("none")
                         
             elif platform == '29cm':
                 driver.get(URL)
@@ -152,10 +157,11 @@ def process_data():
             elif platform == 'zigzag':
                 print("test, zigzag")
                 brand_info.append("test_zigzag")
-
-    def combind_brand_old_product(old_product,brand_info):
+        combind_brand_old_product(old_product, brand_info)
+        
+    def combind_brand_old_product(old_product,brand_inf):
         # old_product와 brand_info의 길이를 비교
-        old_product_length,brand_info_length = len(old_product),len(brand_info)
+        old_product_length,brand_info_length = len(old_product),len(brand_inf)
         if(old_product_length == brand_info_length):
             print("값 일치")
         # 길이가 일치하는지부터 확인.

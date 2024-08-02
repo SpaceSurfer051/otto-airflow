@@ -15,6 +15,8 @@ v6
  - 29cm에서 예외처리를 추가해줬음.
  - musinsa와 29cm에서 예외처리를 추가해줬음.
  - 결합 전 old_product와 brand_info 길이가 같아야 추가할 수 있음. 그러니 길이가 같은지 테스트부터 진행.
+ 
+
 '''
 
 
@@ -29,7 +31,7 @@ default_args = {
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v6',
+    'process_brand_info_dag_v7',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
