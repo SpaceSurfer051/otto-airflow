@@ -3,7 +3,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from airflow_add_brand_file import process_musinsa_products, process_29cm_products, process_zigzag_products, combine_and_upload
+from airflow_add_brand_file2 import process_musinsa_products, process_29cm_products, process_zigzag_products, combine_and_upload
 from datetime import timedelta
 
 # 기본 설정

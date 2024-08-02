@@ -89,7 +89,44 @@ def process_musinsa_products(ti):
     ti.xcom_push(key='musinsa_products', value=musinsa_products.to_dict('records'))
 
 
+
 # 29cm 플랫폼의 데이터를 처리하는 함수
+def process_29cm_products(ti):
+    old_product = fetch_old_product_info()
+    cm29_products = old_product[old_product['platform'] == '29cm']
+    brand_info = []
+    urls = cm29_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+    wait = WebDriverWait(driver, 5)
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(1)
+
+        try:
+            brand_29cm = wait.until(
+                EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))
+            ).text
+            logging.info(f"브랜드: {brand_29cm}, 플랫폼: 29cm")
+            brand_info.append(brand_29cm)
+        except (NoSuchElementException, TimeoutException):
+            logging.info("브랜드 정보 없음")
+            brand_info.append("none")
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append("none")
+
+    driver.quit()
+    cm29_products['brand'] = brand_info
+    # XCom에 데이터 저장
+    ti.xcom_push(key='29cm_products', value=cm29_products.to_dict('records'))
+
 # zigzag 플랫폼의 데이터를 처리하는 함수
 def process_zigzag_products(ti):
     old_product = fetch_old_product_info()
@@ -131,18 +168,6 @@ def process_zigzag_products(ti):
             brand_info.append("none")
 
     driver.quit()
-    zigzag_products['brand'] = brand_info
-    # XCom에 데이터 저장
-    ti.xcom_push(key='zigzag_products', value=zigzag_products.to_dict('records'))
-
-
-
-# Zigzag 플랫폼의 데이터를 처리하는 함수
-def process_zigzag_products(ti):
-    old_product = fetch_old_product_info()
-    zigzag_products = old_product[old_product['platform'] == 'zigzag']
-    brand_info = ['test_zigzag'] * len(zigzag_products)
-
     zigzag_products['brand'] = brand_info
     # XCom에 데이터 저장
     ti.xcom_push(key='zigzag_products', value=zigzag_products.to_dict('records'))
