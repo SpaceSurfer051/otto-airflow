@@ -104,7 +104,7 @@ def print_csv_head():
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v9_2',
+    'process_brand_info_dag_v10',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
