@@ -1,8 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-import redshift_tasks
-import rds_tasks
+
+
+from rds_redshift_upload.rds_tasks import *
+from rds_redshift_upload.redshift_tasks import *
+
 from airflow.utils.task_group import TaskGroup
 
 default_args = {
