@@ -1,23 +1,19 @@
-# airflow_add_brand_dag.py
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow import DAG
 from airflow.utils.dates import days_ago
-from airflow_add_brand_file import process_musinsa_products, process_29cm_products, process_zigzag_products, combine_and_upload
+from all_update_brand.airflow_add_brand_file import (
+    process_musinsa_products,
+    process_29cm_products,
+    process_zigzag_products,
+    combine_and_upload,
+    prepare_update_urls,
+    update_musinsa_crawling,
+    update_29cm_crawling,
+    update_zigzag_crawling,
+    combine_and_upload_updated
+)
 from datetime import timedelta
-import logging
-import boto3
-import pandas as pd
-import io
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from selenium.webdriver.chrome.options import Options
-import time
 from airflow.hooks.S3_hook import S3Hook
-from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
 '''
@@ -61,9 +57,13 @@ v10
  - local 환경에서 테스트를 하며 brand가 추가된 csv 파일이 현재 s3://integrated-data/brand/ 아래에 존재함.
  - 이를 활용하여 이미 존재하면 True, 존재하지 않으면 False로 접근하고자 함.(분기 처리)
     
-    
+    v10_1
+        - 분기처리하여, update하는 코드를 추가 했음.
+        
 '''
 
+
+# 기본 설정
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -82,29 +82,14 @@ def check_file_exists():
     
     if s3_key in keys:
         logging.info(f"File {s3_key} exists.")
-        return 'print_csv_head_task'
+        return 'prepare_update_urls_task'  # 파일이 존재하면 업데이트 준비
     else:
         logging.info(f"File {s3_key} does not exist.")
-        return 'process_zigzag_products'
-
-
-# CSV 파일에서 상위 10개 행을 출력하는 함수
-def print_csv_head():
-    bucket_name = 'otto-glue'
-    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
-    
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    s3_object = s3_hook.get_key(s3_key, bucket_name)
-    
-    s3_data = s3_object.get()['Body'].read().decode('utf-8')
-    data = pd.read_csv(io.StringIO(s3_data))
-    
-    logging.info("CSV file head:")
-    logging.info(data.head(10))
+        return 'process_zigzag_products'  # 파일이 없으면 전체 크롤링
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v10',
+    'process_brand_info_dag_v10_2',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
@@ -118,42 +103,67 @@ branching_task = BranchPythonOperator(
     dag=dag,
 )
 
-# CSV 파일에서 상위 10개 행을 출력하는 태스크
-print_csv_head_task = PythonOperator(
-    task_id='print_csv_head_task',
-    python_callable=print_csv_head,
+# 업데이트할 URL 목록 준비 태스크
+prepare_update_urls_task = PythonOperator(
+    task_id='prepare_update_urls_task',
+    python_callable=prepare_update_urls,
     dag=dag,
 )
 
-# Task 정의
+# Musinsa 업데이트 크롤링 태스크
+update_musinsa_task = PythonOperator(
+    task_id='update_musinsa_crawling',
+    python_callable=update_musinsa_crawling,
+    dag=dag,
+)
+
+# 29cm 업데이트 크롤링 태스크
+update_29cm_task = PythonOperator(
+    task_id='update_29cm_crawling',
+    python_callable=update_29cm_crawling,
+    dag=dag,
+)
+
+# Zigzag 업데이트 크롤링 태스크
+update_zigzag_task = PythonOperator(
+    task_id='update_zigzag_crawling',
+    python_callable=update_zigzag_crawling,
+    dag=dag,
+)
+
+# 업데이트된 결과를 결합하여 S3에 업로드하는 태스크
+combine_and_upload_updated_task = PythonOperator(
+    task_id='combine_and_upload_updated',
+    python_callable=combine_and_upload_updated,
+    dag=dag,
+)
+
+# 기존 크롤링 태스크
 process_musinsa_task = PythonOperator(
     task_id='process_musinsa_products',
     python_callable=process_musinsa_products,
-    provide_context=True,
     dag=dag,
 )
 
 process_29cm_task = PythonOperator(
     task_id='process_29cm_products',
     python_callable=process_29cm_products,
-    provide_context=True,
     dag=dag,
 )
 
 process_zigzag_task = PythonOperator(
     task_id='process_zigzag_products',
     python_callable=process_zigzag_products,
-    provide_context=True,
     dag=dag,
 )
 
 combine_and_upload_task = PythonOperator(
     task_id='combine_and_upload',
     python_callable=combine_and_upload,
-    provide_context=True,
     dag=dag,
 )
 
 # Task dependencies 설정
-branching_task >> [process_zigzag_task, print_csv_head_task]
+branching_task >> [prepare_update_urls_task, process_zigzag_task]
+prepare_update_urls_task >> [update_musinsa_task, update_29cm_task, update_zigzag_task] >> combine_and_upload_updated_task
 process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task

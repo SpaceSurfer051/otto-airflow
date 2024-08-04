@@ -27,13 +27,13 @@ from airflow.utils.task_group import TaskGroup
 
 
 # musinsa
-from airflow_product_review import read_s3_and_compare_links
-from airflow_size_color import read_s3_and_add_size_color
-from airflow_data_preprocessing import data_processing
-from airflow_data_integrated import integrate_data
+from all_update_crawling.airflow_product_review import read_s3_and_compare_links
+from all_update_crawling.airflow_size_color import read_s3_and_add_size_color
+from all_update_crawling.airflow_data_preprocessing import data_processing
+from all_update_crawling.airflow_data_integrated import integrate_data
 
 # zigzag
-from zigzag_crawling import update_crawling_data
+from all_update_crawling.zigzag_crawling import update_crawling_data
 # 체크 0729 - 3
 #from zigzag_crawling import get_product_id, product_crawling, review_crawling
 
