@@ -5,7 +5,7 @@ from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from airflow_add_brand_file import process_musinsa_products, process_29cm_products, process_zigzag_products, combine_and_upload
 from datetime import timedelta
-
+import logging
 '''
 패치내역
 v5
@@ -35,9 +35,21 @@ v9
    - 향후 작업 방안
         - 옷 상세 정보도 가져와보기
         - 브랜드 정보가 이미 s3에 있으면 그거 가져와서 시간 단축하는 구조로 만들기
+        
+        
+    v9_1
+    - local 테스트 결과 이상 없었으나, 클라우드 환경에서 진행하니 리소스 부족으로 task가 up_for_retry 상태에 빠짐
+        - 원인 파악 결과, signal 15가 호출되어 task가 비정상 종료가 되었고, 이는 리소스 부족으로 추측
+        -(https://stackoverflow.com/questions/77096452/gunicorn-worker-getting-exit-in-airflow-web-server-with-received-signal-15-clo)
+        - 리소스 최적화를 위해 병렬처리는 일단 보류
+        
+v10
+ - local 환경에서 테스트를 하며 brand가 추가된 csv 파일이 현재 s3://integrated-data/brand/ 아래에 존재함.
+ - 이를 활용하여 이미 존재하면 True, 존재하지 않으면 False로 접근하고자 함.(분기 처리)
+    
+    
 '''
 
-# 기본 설정
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -46,13 +58,57 @@ default_args = {
     'retry_delay': timedelta(minutes=5),  # 재시도 간격
 }
 
+# CSV 파일 존재 여부 확인 함수
+def check_file_exists():
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    keys = s3_hook.list_keys(bucket_name=bucket_name, prefix='integrated-data/brand/')
+    
+    if s3_key in keys:
+        logging.info(f"File {s3_key} exists.")
+        return 'print_csv_head_task'
+    else:
+        logging.info(f"File {s3_key} does not exist.")
+        return 'process_zigzag_products'
+
+
+# CSV 파일에서 상위 10개 행을 출력하는 함수
+def print_csv_head():
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    s3_object = s3_hook.get_key(s3_key, bucket_name)
+    
+    s3_data = s3_object.get()['Body'].read().decode('utf-8')
+    data = pd.read_csv(io.StringIO(s3_data))
+    
+    logging.info("CSV file head:")
+    logging.info(data.head(10))
+
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v9_1',
+    'process_brand_info_dag_v9_2',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',  # 매일 실행
     catchup=False,  # 지나간 날짜의 작업은 수행하지 않음
+)
+
+# Branching task 정의
+branching_task = BranchPythonOperator(
+    task_id='check_file_exists_task',
+    python_callable=check_file_exists,
+    dag=dag,
+)
+
+# CSV 파일에서 상위 10개 행을 출력하는 태스크
+print_csv_head_task = PythonOperator(
+    task_id='print_csv_head_task',
+    python_callable=print_csv_head,
+    dag=dag,
 )
 
 # Task 정의
@@ -84,5 +140,6 @@ combine_and_upload_task = PythonOperator(
     dag=dag,
 )
 
-# Task 설정
-[process_zigzag_task,process_musinsa_task,  process_29cm_task] >> combine_and_upload_task
+# Task dependencies 설정
+branching_task >> [process_zigzag_task, print_csv_head_task]
+process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
