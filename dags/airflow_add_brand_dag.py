@@ -1,11 +1,25 @@
 # airflow_add_brand_dag.py
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from airflow_add_brand_file import process_musinsa_products, process_29cm_products, process_zigzag_products, combine_and_upload
 from datetime import timedelta
 import logging
+import boto3
+import pandas as pd
+import io
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.chrome.options import Options
+import time
+from airflow.hooks.S3_hook import S3Hook
+from webdriver_manager.chrome import ChromeDriverManager
+import logging
+
 '''
 패치내역
 v5
