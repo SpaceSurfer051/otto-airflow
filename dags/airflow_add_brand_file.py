@@ -1,4 +1,3 @@
-# import
 import boto3
 import pandas as pd
 import io
@@ -8,189 +7,210 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 import time
 from airflow.hooks.S3_hook import S3Hook
 from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
-def process_data():
+
+# S3에서 데이터를 DataFrame으로 가져오는 함수
+def info_to_dataframe(bucket_name, file_key):
+    try:
+        # S3 객체 가져오기
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_object = s3_hook.get_key(file_key, bucket_name)
+
+        # S3 객체의 데이터를 읽어 DataFrame으로 변환
+        s3_data = s3_object.get()['Body'].read().decode('utf-8')
+        data = pd.read_csv(io.StringIO(s3_data))
+        logging.info(f"{file_key} 파일을 성공적으로 읽었습니다.")
+        return data
+    except Exception as e:
+        logging.error(f"S3에서 {file_key}를 읽는 중 오류 발생: {e}")
+        return pd.DataFrame()
+
+
+# S3에서 최신 old_product 데이터를 가져오는 함수
+def fetch_old_product_info():
+    bucket_name = 'otto-glue'
+    prefix_old_product = 'integrated-data/products/'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    old_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_old_product)
+    old_product_key = old_product_file_list[-1]
+    logging.info(f"Old product file key: {old_product_key}")
+    return info_to_dataframe(bucket_name, old_product_key)
+
+
+# Musinsa 플랫폼의 데이터를 처리하는 함수
+def process_musinsa_products(ti):
+    old_product = fetch_old_product_info()
+    musinsa_products = old_product[old_product['platform'] == 'musinsa']
     brand_info = []
+    urls = musinsa_products['description'].tolist()
     
-    
-    
-    ############## s3 정보 가져오는 파트 ############################
-    # s3에서 최신 product 정보를 가져옴, old_product_df로 저장
-    # s3에서 최신 product_add_brand 정보를 가져옴, 존재하는 경우 new_product_df로 저장, 존재하지 않는 경우 반환 값은 empty dataframe
-    # 반환 값이 empty인 경우(아예 없는 경우), 전체 데이터 프레임을 가져옴
-    # 새로운 columns brand를 추가.
-    # pltform이 29cm 인 경우, columns에 brand 추가하고, brand를 이 컬럼에 추가
-    # platform이 무신사인 경우, columns에 brand에 추가하고, brand를 이 컬럼에 추가
-    # platform이 zigzag인 경우, colums에 brand에 추가하고, brand를 이 컬럼에 추가
-    # 이 것들이 끝나면 이 old_product_df를 s3에 brand/combined_products_add_brand.csv에 추가.
-    # new_product_df로 저장이 된 경우(파일이 존재하는 경우)
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
 
-    def info_to_dataframe(bucket_name,file_key,prefix):
-        try:
-            # S3 객체 가져오기
-            s3_hook = S3Hook(aws_conn_id='aws_default')
-            s3_object = s3_hook.get_key(file_key, bucket_name)
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(1)  # 페이지 로드를 위한 대기 시간
 
-            # S3 객체의 데이터를 읽어 DataFrame으로 변환
-            s3_data = s3_object.get()['Body'].read().decode('utf-8')
-            data = pd.read_csv(io.StringIO(s3_data))
-            logging.info(f"{file_key} 파일을 성공적으로 읽었습니다.")
-            return data
-        except Exception as e:
-            logging.error(f"S3에서 {file_key}를 읽는 중 오류 발생: {e}")
-            return pd.DataFrame()
-
-
-    # old_product_info s3에서 리스트를 가져오고 최신 버전 파일 이름 가져오기
-    def old_product_info():
-        bucket_name = 'otto-glue'
-        prefix_old_product = 'integrated-data/products/'
-        s3_hook = S3Hook(aws_conn_id='aws_default')
-        old_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_old_product) 
-        old_product_key = old_product_file_list[-1]       
-        print(old_product_key)
-        old_product = info_to_dataframe(bucket_name,old_product_key,prefix_old_product)
-        crawling_test(old_product)
-
-    # new_product_info, s3에서 리스트를 가져오고 최신 버전 파일 이름 가져오기
-    def new_product_info():  
-        bucket_name = 'otto-glue'
-        prefix_new_product = 'integrated-data/reviews/brand/'
-        s3_hook = S3Hook(aws_conn_id='aws_default')
-
-        try:
-            # S3에서 파일 리스트 가져오기
-            new_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_new_product)
-            new_product_key = new_product_file_list[-1]  # 가장 최신 파일 선택
-            logging.info(f"가져온 최신 제품 추가 정보 파일 키: {new_product_key}")
-
-            # DataFrame으로 변환하여 반환
-            new_product = info_to_dataframe(bucket_name, new_product_key)
-            return new_product
-        except Exception as e:
-            logging.error(f"최신 제품 추가 정보를 가져오는 중 오류 발생(테스트임): {e}")
-            return pd.DataFrame()
-        
-    
-    #crawling part
-    def crawling_test(old_product):
-        # 컬럼명 product_id	rank	product_name	category	price	image_url	description	color	size	platform
-
-        service = Service('/usr/local/bin/chromedriver')
-        options = Options()
-        options.add_experimental_option("excludeSwitches", ["enable-logging"])
-        options.add_argument('--headless')  # GUI를 표시하지 않음
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        driver = webdriver.Chrome(service=service, options=options)
-        wait = WebDriverWait(driver, 5)
-        visit_url = old_product['description']
-        
-
-        for i in range(len(visit_url)):
-            URL = visit_url[i]
-            platform = old_product['platform'][i]
+        brand_found = False
+        # XPath 순회
+        for j in range(11, 18):
+            for z in range(2, 5):
+                try:
+                    # 브랜드 정보를 찾고 추가
+                    brand_musinsa = driver.find_element(By.XPATH, f'//*[@id="root"]/div[{j}]/div[{z}]/dl[1]/dd/a').text
+                    logging.info(f"브랜드: {brand_musinsa}, 플랫폼: musinsa")
+                    brand_info.append(brand_musinsa)
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 내부 루프 종료
+                except NoSuchElementException:
+                    continue  # 현재 XPath에서 요소를 찾을 수 없는 경우 다음으로 넘어감
+                except Exception as e:
+                    logging.error(f"예상치 못한 오류 발생: {str(e)}")
+                    break
             
-            if platform == 'musinsa':
-                driver.get(URL)
-                time.sleep(1)  # 페이지 로드를 위한 대기 시간
+            if brand_found:
+                break  # 외부 루프 종료
+        
+        if not brand_found:
+            logging.info("브랜드 정보 없음")
+            brand_info.append("none")
 
-                # 무신사 플랫폼의 다양한 XPATH를 순회하여 브랜드 정보 수집
-                brand_found = False
-                for j in range(12, 18):  # XPATH의 특정 범위 설정
-                    try:
-                        # 요소가 나타날 때까지 대기 후 텍스트 추출
-                        brand_musinsa = wait.until(
-                            EC.presence_of_element_located((By.XPATH, f'//*[@id="root"]/div[{j}]/div[3]/dl[1]/dd/a'))
-                        ).text
-                        print(f"브랜드: {brand_musinsa}, 플랫폼: {platform}")
-                        brand_info.append(brand_musinsa)
-                        brand_found = True
-                        break  # 요소를 찾으면 반복 종료
-                    except (NoSuchElementException, TimeoutException):
-                        continue  # 요소가 없거나 대기 시간이 초과되면 다음 XPATH로 이동
-                    except Exception as e:
-                        print(f"예상치 못한 오류 발생: {str(e)}")
-                        continue
+    driver.quit()
+    musinsa_products['brand'] = brand_info
+    # XCom에 데이터 저장
+    ti.xcom_push(key='musinsa_products', value=musinsa_products.to_dict('records'))
 
-                if not brand_found:
-                    # XPATH 중 어떤 요소도 발견되지 않은 경우 "none" 추가
-                    print("브랜드 정보 없음")
-                    brand_info.append("none")
-                        
-            elif platform == '29cm':
-                driver.get(URL)
-                time.sleep(1)  # 페이지 로드를 위한 대기 시간
 
+
+# 29cm 플랫폼의 데이터를 처리하는 함수
+def process_29cm_products(ti):
+    old_product = fetch_old_product_info()
+    cm29_products = old_product[old_product['platform'] == '29cm']
+    brand_info = []
+    urls = cm29_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(1)
+
+        try:
+            brand_29cm = driver.find_element(By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3').text
+            logging.info(f"브랜드: {brand_29cm}, 플랫폼: 29cm")
+            brand_info.append(brand_29cm)
+        except NoSuchElementException:
+            logging.info("브랜드 정보 없음")
+            brand_info.append("none")
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append("none")
+
+    driver.quit()
+    cm29_products['brand'] = brand_info
+    # XCom에 데이터 저장
+    ti.xcom_push(key='29cm_products', value=cm29_products.to_dict('records'))
+
+# zigzag 플랫폼의 데이터를 처리하는 함수
+def process_zigzag_products(ti):
+    old_product = fetch_old_product_info()
+    zigzag_products = old_product[old_product['platform'] == 'zigzag']
+    brand_info = []
+    urls = zigzag_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+    wait = WebDriverWait(driver, 15)  # 대기 시간을 15초로 설정
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(2)  # 페이지 로드를 위한 대기 시간
+
+        try:
+            # 지정된 XPath를 클릭
+            brand_found = False
+            for xpath in ['//*[@id="__next"]/div[1]/div/div/div[11]/div/div/div/div/div[2]/div[1]/h2',
+                          '//*[@id="__next"]/div[1]/div/div/div[12]/div/div/div/div/div[2]/div[1]/h2']:
                 try:
-                    # 29cm 플랫폼의 XPATH 탐색
-                    brand_29cm = WebDriverWait(driver, 5).until(
-                        EC.presence_of_element_located((By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3'))
-                    ).text
-                    print(brand_29cm, platform)
-                    brand_info.append(brand_29cm)
-                except (NoSuchElementException, TimeoutException):
-                    # 요소가 없거나 대기 시간이 초과된 경우 "none" 추가
-                    print("브랜드 정보 없음")
-                    brand_info.append("none")
-                except Exception as e:
-                    # 다른 모든 예외에 대해 "none" 추가
-                    print(f"예상치 못한 오류 발생: {str(e)}")
-                    brand_info.append("none")
+                    brand_zigzag = driver.find_element(By.XPATH, xpath).text
+                    logging.info(f"브랜드: {brand_zigzag}, 플랫폼: zigzag")
+                    brand_info.append(brand_zigzag)
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 반복 종료
+                except NoSuchElementException:
+                    continue
+            
+            if not brand_found:
+                # 어떤 xpath에서도 브랜드 정보를 찾지 못한 경우
+                logging.info("브랜드 정보 없음")
+                brand_info.append("none")
 
-            elif platform == 'zigzag':
-                print("test, zigzag")
-                brand_info.append("test_zigzag")
-                try:
-                    brand_zigzag = WebDriverWait(driver, 5).until(
-                        EC.presence_of_all_elements_located(By.XPATH, '//*[@id="__next"]/div[1]/div/div/div[2]/div/button/span')).text
-                    print(brand_zigzag, platform)
-                    brand_info(brand_zigzag)
-                except (NoSuchElementException, TimeoutException):
-                    print("브랜드 정보 X")
-                    brand_info.append("none")
-                except Exception as e:
-                    print(f"예상치 못한 오류 발생: {str(e)}")
-                    brand_info.append('none')
-                
-                
-        combind_brand_old_product(old_product, brand_info)
-        
-    def combind_brand_old_product(old_product,brand_inf):
-        # old_product와 brand_info의 길이를 비교
-        old_product_length,brand_info_length = len(old_product),len(brand_inf)
-        # 길이가 일치하는지부터 확인.
-        if old_product_length == brand_info_length:
-            print("값 일치")
-            # 값이 일치하면, old_product에 새로운 컬럼의 값을 brand_info로 추가
-            old_product['brand'] = brand_info
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append("none")
 
-            # DataFrame을 CSV 형식으로 변환
-            csv_buffer = io.StringIO()
-            old_product.to_csv(csv_buffer, index=False)
+    driver.quit()  # 드라이버 종료
+    zigzag_products['brand'] = brand_info
+    # XCom에 데이터 저장
+    ti.xcom_push(key='zigzag_products', value=zigzag_products.to_dict('records'))
 
-            # S3에 CSV 파일 업로드
-            bucket_name = 'otto-glue'
-            s3_key = 'integrated-data/brand/test_brand_info.csv'
-            s3_hook = S3Hook(aws_conn_id='aws_default')
-            s3_hook.load_string(
-                csv_buffer.getvalue(),
-                key=s3_key,
-                bucket_name=bucket_name,
-                replace=True
-            )
-            print(f"{s3_key}로 S3에 성공적으로 업로드되었습니다.")
-        else:
-            print("결합 실패, 길이 불일치.")
 
-        
-        
-        
-    old_product_info()
-    new_product_info()
+# 결과를 결합하여 S3에 업로드하는 함수
+def combine_and_upload(ti):
+    # 기존 제품 정보 가져오기.
+    old_product = fetch_old_product_info()
+    
+    # XCom에서 병렬 처리된 플랫폼별 제품 데이터를 가져옴
+    musinsa_products = ti.xcom_pull(key='musinsa_products', task_ids='process_musinsa_products')
+    cm29_products = ti.xcom_pull(key='29cm_products', task_ids='process_29cm_products')
+    zigzag_products = ti.xcom_pull(key='zigzag_products', task_ids='process_zigzag_products')
+    
+    # XCom에서 가져온 데이터를 데이터프레임으로 변환
+    musinsa_df = pd.DataFrame(musinsa_products)
+    cm29_df = pd.DataFrame(cm29_products)
+    zigzag_df = pd.DataFrame(zigzag_products)
+
+    # 기존 데이터프레임과 새로 크롤링된 데이터를 병합
+    # description과 URL을 기준으로 브랜드 정보를 병합
+    combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
+
+
+    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
+    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
+
+    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
+    csv_buffer = io.StringIO()
+    new_product_df.to_csv(csv_buffer, index=False)
+
+    # S3에 CSV 파일을 업로드
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    
+    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
+    s3_hook.load_string(
+        csv_buffer.getvalue(),
+        key=s3_key,
+        bucket_name=bucket_name,
+        replace=True  # 덮어쓰기 옵션
+    )
+    
+    logging.info(f"Combined products uploaded to {s3_key}")
