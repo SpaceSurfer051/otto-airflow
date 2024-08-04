@@ -3,7 +3,8 @@ from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.hooks.S3_hook import S3Hook
 from airflow.models import XCom
-from sqlalchemy.orm import Session
+from airflow.utils.session import provide_session
+from sqlalchemy.orm import Session as SQLASession
 import logging
 from all_update_brand.airflow_add_brand_file import (
     process_musinsa_products,
@@ -68,8 +69,6 @@ v11(예정)
     - 문제 원인 파악 결과, 지속적인 테스트를 위한 dag 호출 결과 key-value 형태로 구성된 xcom에서 여러 데이터를 가져오는 문제 확인
     
 '''
-
-
 # 기본 설정
 default_args = {
     'owner': 'airflow',
@@ -80,11 +79,10 @@ default_args = {
 }
 
 # XCom 데이터 초기화 함수
-def clear_xcom_data(**context):
-    session = Session(bind=context['ti'].get_dagrun().get_session())
+@provide_session
+def clear_xcom_data(session: SQLASession = None, **context):
     session.query(XCom).filter(XCom.dag_id == context['dag'].dag_id).delete()
     session.commit()
-    session.close()
     logging.info("XCom data cleared")
 
 # CSV 파일 존재 여부 확인 함수
