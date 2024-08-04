@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import logging
 
 
+
 # S3에서 데이터를 DataFrame으로 가져오는 함수
 def info_to_dataframe(bucket_name, file_key):
     try:
