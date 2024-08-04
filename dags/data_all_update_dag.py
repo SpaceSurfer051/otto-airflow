@@ -38,6 +38,11 @@ from all_update_crawling.zigzag_crawling import update_crawling_data
 #from zigzag_crawling import get_product_id, product_crawling, review_crawling
 
 
+'''
+dag 실행 순서는 data_all_update_dag -> airflow_add_brand_dag -> redshift_data_upload_dag 
+
+'''
+
 # 기본 인자 설정
 default_args = {
     "owner": "airflow",

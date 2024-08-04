@@ -36,6 +36,7 @@ def create_tables():
         color varchar(max),
         size varchar(max),
         platform varchar(max),
+        brand varchar(max),
         UNIQUE (product_name)
     );
 
@@ -84,7 +85,7 @@ def generate_unique_id():
 # S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
-    prefix_product = 'integrated-data/products/'
+    prefix_product = 'integrated-data/products/brand/'
     s3_hook = S3Hook(aws_conn_id='aws_default')
     files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product)
     product_key = files_product[-1]
@@ -111,8 +112,8 @@ def upload_product_data(**kwargs):
         exists = cursor.fetchone()
         if not exists:
             cursor.execute("""
-                INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform,brand)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
                 """, tuple(row))
     
     connection.commit()
@@ -178,11 +179,4 @@ def process_and_upload_review_data(**kwargs):
     else:
         print("No new reviews to insert.")
 
-# 각 열의 최대 길이를 식별하는 함수
-def identify_max_lengths(**kwargs):
-    bucket_name = 'otto-glue'
-    review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
-    review_df = read_s3_to_dataframe(bucket_name, review_key)
-    max_lengths = review_df.applymap(lambda x: len(str(x)) if pd.notnull(x) else 0).max()
-    print("Max lengths of each column:")
-    print(max_lengths)
+

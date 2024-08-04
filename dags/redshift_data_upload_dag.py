@@ -58,13 +58,9 @@ with dag:
             provide_context=True,
         )
 
-        identify_max_lengths_task = PythonOperator(
-            task_id='identify_max_lengths',
-            python_callable=identify_max_lengths,
-            provide_context=True,
-        )
 
-        create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task >> identify_max_lengths_task >> process_and_upload_review_data_task
+
+        create_schema_task >> create_tables_task >> upload_product_data_task >> read_review_data_task >> get_existing_product_names_task  >> process_and_upload_review_data_task
 
     with TaskGroup('rds_part', tooltip='rds_part') as rds_part:
         create_rds_tables_task = PythonOperator(

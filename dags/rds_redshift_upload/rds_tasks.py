@@ -23,6 +23,7 @@ def create_rds_tables():
         color varchar(1024),
         size varchar(1024),
         platform varchar(1024),
+        brand varchar(1024),
         UNIQUE (product_name)
     );
     
@@ -68,8 +69,8 @@ def transfer_data_to_rds():
     # Product data insert
     for _, row in product_df.iterrows():
         cursor.execute("""
-            INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform, brand)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
             ON CONFLICT (product_name) DO NOTHING
         """, tuple(row))
     

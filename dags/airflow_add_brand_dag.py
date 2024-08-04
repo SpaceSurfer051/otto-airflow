@@ -15,7 +15,6 @@ from all_update_brand.airflow_add_brand_file import (
 from datetime import timedelta
 from airflow.hooks.S3_hook import S3Hook
 import logging
-
 '''
 패치내역
 v5
@@ -61,15 +60,13 @@ v10
         - 분기처리하여, update하는 코드를 추가 했음.
         
 '''
-
-
 # 기본 설정
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': days_ago(1),  # 시작 날짜를 현재 시점으로 설정
-    'retries': 1,  # 실패 시 재시도 횟수
-    'retry_delay': timedelta(minutes=5),  # 재시도 간격
+    'start_date': days_ago(1),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
 }
 
 # CSV 파일 존재 여부 확인 함수
@@ -82,24 +79,41 @@ def check_file_exists():
     
     if s3_key in keys:
         logging.info(f"File {s3_key} exists.")
-        return 'prepare_update_urls_task'  # 파일이 존재하면 업데이트 준비
+        return 'prepare_update_urls_task'
     else:
         logging.info(f"File {s3_key} does not exist.")
-        return 'process_zigzag_products'  # 파일이 없으면 전체 크롤링
+        return 'process_zigzag_products'
+
+# 업데이트할 URL 목록 준비 태스크
+def branch_update_decision(ti):
+    update_urls = prepare_update_urls(ti)
+    
+    # 업데이트할 항목이 없는 경우 모든 업데이트 태스크를 건너뛰도록 설정
+    if not update_urls:
+        return 'skip_update_tasks'
+    else:
+        return 'prepare_update_urls_task'
 
 # DAG 정의
 dag = DAG(
     'process_brand_info_dag_v10_2',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
-    schedule_interval='@daily',  # 매일 실행
-    catchup=False,  # 지나간 날짜의 작업은 수행하지 않음
+    schedule_interval='@daily',
+    catchup=False,
 )
 
 # Branching task 정의
 branching_task = BranchPythonOperator(
     task_id='check_file_exists_task',
     python_callable=check_file_exists,
+    dag=dag,
+)
+
+# 업데이트 여부 결정 태스크 정의
+update_decision_task = BranchPythonOperator(
+    task_id='update_decision_task',
+    python_callable=branch_update_decision,
     dag=dag,
 )
 
@@ -138,6 +152,13 @@ combine_and_upload_updated_task = PythonOperator(
     dag=dag,
 )
 
+# 업데이트가 없는 경우 모든 업데이트 태스크를 건너뛰고 종료 태스크로 이동
+skip_update_tasks = PythonOperator(
+    task_id='skip_update_tasks',
+    python_callable=lambda: logging.info("업데이트할 항목이 없어 태스크를 건너뜁니다."),
+    dag=dag,
+)
+
 # 기존 크롤링 태스크
 process_musinsa_task = PythonOperator(
     task_id='process_musinsa_products',
@@ -164,6 +185,7 @@ combine_and_upload_task = PythonOperator(
 )
 
 # Task dependencies 설정
-branching_task >> [prepare_update_urls_task, process_zigzag_task]
+branching_task >> [update_decision_task, process_zigzag_task]
+update_decision_task >> [prepare_update_urls_task, skip_update_tasks]
 prepare_update_urls_task >> [update_musinsa_task, update_29cm_task, update_zigzag_task] >> combine_and_upload_updated_task
 process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
