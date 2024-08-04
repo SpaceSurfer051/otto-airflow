@@ -26,41 +26,41 @@ with dag:
     with TaskGroup('redshift_part', tooltip='redshift_data_upload_part') as redshift_part:
         create_schema_task = PythonOperator(
             task_id='create_schema',
-            python_callable=redshift_tasks.create_schema,
+            python_callable=create_schema,
         )
 
         create_tables_task = PythonOperator(
             task_id='create_tables',
-            python_callable=redshift_tasks.create_tables,
+            python_callable = create_tables,
         )
 
         upload_product_data_task = PythonOperator(
             task_id='upload_product_data',
-            python_callable=redshift_tasks.upload_product_data,
+            python_callable=upload_product_data,
             provide_context=True,
         )
 
         read_review_data_task = PythonOperator(
             task_id='read_review_data',
-            python_callable=redshift_tasks.read_review_data,
+            python_callable=read_review_data,
             provide_context=True,
         )
 
         get_existing_product_names_task = PythonOperator(
             task_id='get_existing_product_names',
-            python_callable=redshift_tasks.get_existing_product_names,
+            python_callable=get_existing_product_names,
             provide_context=True,
         )
 
         process_and_upload_review_data_task = PythonOperator(
             task_id='process_and_upload_review_data',
-            python_callable=redshift_tasks.process_and_upload_review_data,
+            python_callable=process_and_upload_review_data,
             provide_context=True,
         )
 
         identify_max_lengths_task = PythonOperator(
             task_id='identify_max_lengths',
-            python_callable=redshift_tasks.identify_max_lengths,
+            python_callable=identify_max_lengths,
             provide_context=True,
         )
 
@@ -69,12 +69,12 @@ with dag:
     with TaskGroup('rds_part', tooltip='rds_part') as rds_part:
         create_rds_tables_task = PythonOperator(
             task_id='create_rds_tables',
-            python_callable=rds_tasks.create_rds_tables,
+            python_callable=create_rds_tables,
         )
 
         transfer_data_to_rds_task = PythonOperator(
             task_id='transfer_data_to_rds',
-            python_callable=rds_tasks.transfer_data_to_rds,
+            python_callable=transfer_data_to_rds,
             provide_context=True,
         )
 
