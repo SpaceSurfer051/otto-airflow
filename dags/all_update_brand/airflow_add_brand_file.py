@@ -335,6 +335,7 @@ def combine_and_upload(ti):
 
     # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
     new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
+    new_product_df = new_product_df.drop_duplicates()
 
     # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
     csv_buffer = io.StringIO()
@@ -376,7 +377,7 @@ def combine_and_upload_updated(ti):
 
     # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
     new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
-
+    new_product_df = new_product_df.drop_duplicates()
     # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
     csv_buffer = io.StringIO()
     new_product_df.to_csv(csv_buffer, index=False)

@@ -85,7 +85,7 @@ def generate_unique_id():
 # S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
 def upload_product_data(**kwargs):
     bucket_name = 'otto-glue'
-    prefix_product = 'integrated-data/products/brand/'
+    prefix_product = 'integrated-data/brand/'
     s3_hook = S3Hook(aws_conn_id='aws_default')
     files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product)
     product_key = files_product[-1]
