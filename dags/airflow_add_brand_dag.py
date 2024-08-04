@@ -1,6 +1,10 @@
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow import DAG
 from airflow.utils.dates import days_ago
+from airflow.hooks.S3_hook import S3Hook
+from airflow.models import XCom
+from sqlalchemy.orm import Session
+import logging
 from all_update_brand.airflow_add_brand_file import (
     process_musinsa_products,
     process_29cm_products,
@@ -13,8 +17,6 @@ from all_update_brand.airflow_add_brand_file import (
     combine_and_upload_updated
 )
 from datetime import timedelta
-from airflow.hooks.S3_hook import S3Hook
-import logging
 '''
 패치내역
 v5
@@ -60,7 +62,14 @@ v10
         - 분기처리하여, update하는 코드를 추가 했음.
     v10_3
         - update할만한 데이터가 없으면 모든 task가 종료
+        
+v11(예정)
+ - 데이터가 예상치 못하게 중복저장 되는 중.
+    - 문제 원인 파악 결과, 지속적인 테스트를 위한 dag 호출 결과 key-value 형태로 구성된 xcom에서 여러 데이터를 가져오는 문제 확인
+    
 '''
+
+
 # 기본 설정
 default_args = {
     'owner': 'airflow',
@@ -69,6 +78,14 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
+
+# XCom 데이터 초기화 함수
+def clear_xcom_data(**context):
+    session = Session(bind=context['ti'].get_dagrun().get_session())
+    session.query(XCom).filter(XCom.dag_id == context['dag'].dag_id).delete()
+    session.commit()
+    session.close()
+    logging.info("XCom data cleared")
 
 # CSV 파일 존재 여부 확인 함수
 def check_file_exists():
@@ -89,7 +106,6 @@ def check_file_exists():
 def branch_update_decision(ti):
     update_urls = prepare_update_urls(ti)
     
-    # 업데이트할 항목이 없는 경우 모든 업데이트 태스크를 건너뛰도록 설정
     if not update_urls:
         return 'skip_update_tasks'
     else:
@@ -102,6 +118,22 @@ dag = DAG(
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',
     catchup=False,
+)
+
+# XCom 초기화 Task (시작 전)
+clear_xcom_start = PythonOperator(
+    task_id='clear_xcom_start',
+    python_callable=clear_xcom_data,
+    provide_context=True,
+    dag=dag,
+)
+
+# XCom 초기화 Task (종료 후)
+clear_xcom_end = PythonOperator(
+    task_id='clear_xcom_end',
+    python_callable=clear_xcom_data,
+    provide_context=True,
+    dag=dag,
 )
 
 # Branching task 정의
@@ -186,7 +218,9 @@ combine_and_upload_task = PythonOperator(
 )
 
 # Task dependencies 설정
+clear_xcom_start >> branching_task
 branching_task >> [update_decision_task, process_zigzag_task]
 update_decision_task >> [prepare_update_urls_task, skip_update_tasks]
 prepare_update_urls_task >> [update_musinsa_task, update_29cm_task, update_zigzag_task] >> combine_and_upload_updated_task
 process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
+[combine_and_upload_updated_task, combine_and_upload_task, skip_update_tasks] >> clear_xcom_end
