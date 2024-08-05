@@ -46,7 +46,13 @@ def fetch_new_product_info():
     new_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_new_product)
     new_product_key = new_product_file_list[-1]
     logging.info(f"New product file key: {new_product_key}")
-    return info_to_dataframe(bucket_name, new_product_key)
+    
+    # DataFrame 로드 후 중복 제거
+    new_product_df = info_to_dataframe(bucket_name, new_product_key)
+    new_product_df.drop_duplicates(inplace=True)  # 중복 제거
+    logging.info("New product data 중복 제거 완료.")
+    
+    return new_product_df
 
 # 업데이트할 URL 목록을 준비하는 함수
 def prepare_update_urls(ti):
