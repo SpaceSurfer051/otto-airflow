@@ -22,8 +22,9 @@ dag = DAG(
 
 
 def fetch_and_process_data(**kwargs):
-    product_df = fetch_data_from_redshift("proudct_table")
-    reviews_df = fetch_data_from_redshift("reviews")
+    # product_df = fetch_data_from_redshift("proudct_table")
+    # reviews_df = fetch_data_from_redshift("reviews")
+    product_df, reviews_df = fetch_data_from_redshift()
     gender_df = create_gender_df(product_df, reviews_df)
     logging.info(gender_df)
 

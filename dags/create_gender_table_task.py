@@ -3,29 +3,36 @@ import logging
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
-def fetch_data_from_redshift(table):
+def fetch_data_from_redshift():
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
-    query = f"SELECT * FROM otto.{table}"
+    products_query = "SELECT * FROM otto.product_table"
+    reviews_query = "SELECT * FROM otto.reviews"
 
     connection = redshift_hook.get_conn()
-    df = pd.read_sql(query, connection)
+    products_df = pd.read_sql(products_query, connection)
+    reviews_df = pd.read_sql(reviews_query, connection)
 
     connection.close()
 
-    return df
+    return products_df, reviews_df
+
+
+# def fetch_data_from_redshift(table):
+#     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
+#     query = f"SELECT * FROM otto.{table}"
+
+#     connection = redshift_hook.get_conn()
+#     df = pd.read_sql(query, connection)
+
+#     connection.close()
+
+#     return df
 
 
 def create_gender_df(product_df, reviews_df):
-    # product_df와 reviews_df를 product_name을 기준으로 병합
     merged_df = pd.merge(product_df, reviews_df, on="product_name", how="left")
-
-    # 'platform'이 'zigzag'인 경우 gender를 'female'로 설정
     merged_df.loc[merged_df["platform"] == "zigzag", "gender"] = "female"
-
-    # 'platform'이 null인 경우 해당 행을 삭제
     merged_df = merged_df[merged_df["platform"].notna()]
-
-    # 필요한 컬럼만 선택
     result_df = merged_df[["product_name", "gender"]].drop_duplicates()
 
     return result_df
