@@ -1,4 +1,5 @@
 import pandas as pd
+import logging
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -20,6 +21,7 @@ def process_data(products_df, reviews_df):
     # Filtering rows where required columns are not 'none'
     filtered_reviews_df = reviews_df[
         (reviews_df["product_name"] != "none")
+        & (reviews_df["gender"] != "none")
         & (reviews_df["size"] != "none")
         & (reviews_df["height"] != "none")
         & (reviews_df["weight"] != "none")
@@ -29,17 +31,25 @@ def process_data(products_df, reviews_df):
     def recommend_size(row, size_list):
         try:
             index = size_list.index(row["size"])
-            if row["size_comment"] == "작다":
+            if row["size_comment"] == "작아요":
+                logging.info("작아요")
+                print("작아요")
                 return (
                     size_list[index + 1]
                     if index + 1 < len(size_list)
                     else size_list[index]
                 )
-            elif row["size_comment"] == "크다":
+            elif row["size_comment"] == "커요":
+                logging.info("커요")
+                print("커요")
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
+                logging.info("잘 맞아요")
+                print("잘 맞아요")
                 return size_list[index]
         except ValueError:
+            logging.info("except")
+            print("except")
             return row["size"]
 
     # Generating size recommendations
@@ -60,7 +70,15 @@ def process_data(products_df, reviews_df):
 
     # Selecting required columns
     ml_df = filtered_reviews_df[
-        ["product_name", "size", "height", "weight", "size_comment", "size_recommend"]
+        [
+            "product_name",
+            "gender",
+            "size",
+            "height",
+            "weight",
+            "size_comment",
+            "size_recommend",
+        ]
     ]
 
     return ml_df
@@ -77,6 +95,7 @@ def upload_ml_table_to_redshift(ml_df):
     DROP TABLE IF EXISTS otto.ml_table CASCADE;
     CREATE TABLE IF NOT EXISTS otto.ml_table (
         product_name TEXT,
+        gender TEXT,
         size TEXT,
         height TEXT,
         weight TEXT,
@@ -90,7 +109,7 @@ def upload_ml_table_to_redshift(ml_df):
     for _, row in ml_df.iterrows():
         cursor.execute(
             """
-            INSERT INTO otto.ml_table (product_name, size, height, weight, size_comment, size_recommend)
+            INSERT INTO otto.ml_table (product_name, gender, size, height, weight, size_comment, size_recommend)
             VALUES (%s, %s, %s, %s, %s, %s)
         """,
             tuple(row),
