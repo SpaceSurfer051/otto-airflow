@@ -18,11 +18,13 @@ def fetch_data_from_redshift():
 
 
 def create_gender_df(product_df, reviews_df):
-    merged_df = pd.merge(product_df, reviews_df, on="product_name", how="left")
+    merged_df = pd.merge(product_df, reviews_df, on="product_name", how="right")
     merged_df.loc[merged_df["platform"] == "zigzag", "gender"] = "female"
+    merged_df.loc[merged_df["gender"] == "남성", "gender"] = "male"
+    merged_df.loc[merged_df["gender"] == "여성", "gender"] = "female"
     merged_df = merged_df[merged_df["platform"].notna()]
+    merged_df = merged_df[merged_df["gender"].notna()]
     result_df = merged_df[["product_name", "gender"]].drop_duplicates()
-
     return result_df
 
 
