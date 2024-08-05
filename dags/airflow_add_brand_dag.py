@@ -60,7 +60,7 @@ def check_file_and_decide_update(ti):
             logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
             
             # 업데이트할 URL을 준비합니다.
-            update_urls = prepare_update_urls()
+            update_urls = old_product[~old_product['description'].isin(new_product['description'])]
             
             # update_urls가 None이 아니고, 비어있지 않으면 업데이트 진행
             if len(update_urls) > 0:
