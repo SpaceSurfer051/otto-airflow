@@ -53,3 +53,46 @@ def upload_gender_table_to_redshift(df):
     connection.commit()
     cursor.close()
     connection.close()
+
+
+def upload_gender_table_to_rds():
+    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
+    rds_hook = PostgresHook(postgres_conn_id="otto_rds")
+
+    # Redshift로부터 gender_table 데이터를 가져오기
+    redshift_connection = redshift_hook.get_conn()
+    redshift_cursor = redshift_connection.cursor()
+
+    redshift_cursor.execute("SELECT product_name, gender FROM otto.gender_table")
+    gender_data = redshift_cursor.fetchall()
+
+    # RDS에 연결
+    rds_connection = rds_hook.get_conn()
+    rds_cursor = rds_connection.cursor()
+
+    # RDS에 gender_table 생성 쿼리 실행
+    rds_cursor.execute(
+        """
+        DROP TABLE IF EXISTS otto.gender_table CASCADE;
+        CREATE TABLE IF NOT EXISTS otto.gender_table (
+            product_name TEXT,
+            gender TEXT
+        );
+        """
+    )
+
+    # Redshift로부터 가져온 데이터를 RDS에 적재
+    insert_query = (
+        "INSERT INTO otto.gender_table (product_name, gender) VALUES (%s, %s)"
+    )
+    for row in gender_data:
+        rds_cursor.execute(insert_query, row)
+
+    # 변경사항 커밋
+    rds_connection.commit()
+
+    # 커서와 연결 닫기
+    redshift_cursor.close()
+    redshift_connection.close()
+    rds_cursor.close()
+    rds_connection.close()
