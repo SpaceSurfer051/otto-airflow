@@ -15,7 +15,9 @@ from all_update_brand.airflow_add_brand_file import (
     update_musinsa_crawling,
     update_29cm_crawling,
     update_zigzag_crawling,
-    combine_and_upload_updated
+    combine_and_upload_updated,
+    fetch_old_product_info,
+    fetch_new_product_info,    
 )
 from datetime import timedelta
 '''
