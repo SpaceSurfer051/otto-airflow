@@ -17,18 +17,6 @@ def fetch_data_from_redshift():
     return products_df, reviews_df
 
 
-# def fetch_data_from_redshift(table):
-#     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
-#     query = f"SELECT * FROM otto.{table}"
-
-#     connection = redshift_hook.get_conn()
-#     df = pd.read_sql(query, connection)
-
-#     connection.close()
-
-#     return df
-
-
 def create_gender_df(product_df, reviews_df):
     merged_df = pd.merge(product_df, reviews_df, on="product_name", how="left")
     merged_df.loc[merged_df["platform"] == "zigzag", "gender"] = "female"
@@ -38,12 +26,11 @@ def create_gender_df(product_df, reviews_df):
     return result_df
 
 
-def upload_ml_table_to_redshift(df):
+def upload_gender_table_to_redshift(df):
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     connection = redshift_hook.get_conn()
     cursor = connection.cursor()
 
-    # Create ML table
     cursor.execute(
         """
         DROP TABLE IF EXISTS otto.gender CASCADE;
@@ -54,7 +41,6 @@ def upload_ml_table_to_redshift(df):
         """
     )
 
-    # Insert data into ML table
     for _, row in df.iterrows():
         cursor.execute(
             """
