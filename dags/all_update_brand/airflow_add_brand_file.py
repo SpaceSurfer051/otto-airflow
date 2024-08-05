@@ -330,7 +330,47 @@ def update_zigzag_crawling(ti):
     driver.quit()  # 드라이버 종료
     # XCom에 데이터 저장
     ti.xcom_push(key='zigzag_update_info', value=brand_info)
+# 결과를 결합하여 S3에 업로드하는 함수
+def combine_and_upload(ti):
+    # 기존 제품 정보 가져오기.
+    old_product = fetch_old_product_info()
+    
+    # XCom에서 병렬 처리된 플랫폼별 제품 데이터를 가져옴
+    musinsa_products = ti.xcom_pull(key='musinsa_products', task_ids='process_musinsa_products')
+    cm29_products = ti.xcom_pull(key='cm29_products', task_ids='process_29cm_products')
+    zigzag_products = ti.xcom_pull(key='zigzag_products', task_ids='process_zigzag_products')
+    
+    # XCom에서 가져온 데이터를 데이터프레임으로 변환
+    musinsa_df = pd.DataFrame(musinsa_products)
+    cm29_df = pd.DataFrame(cm29_products)
+    zigzag_df = pd.DataFrame(zigzag_products)
 
+    # 기존 데이터프레임과 새로 크롤링된 데이터를 병합
+    # description과 URL을 기준으로 브랜드 정보를 병합
+    combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
+
+    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
+    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
+    new_product_df = new_product_df.drop_duplicates()
+
+    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
+    csv_buffer = io.StringIO()
+    new_product_df.to_csv(csv_buffer, index=False)
+
+    # S3에 CSV 파일을 업로드
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    
+    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
+    s3_hook.load_string(
+        csv_buffer.getvalue(),
+        key=s3_key,
+        bucket_name=bucket_name,
+        replace=True  # 덮어쓰기 옵션
+    )
+    
+    logging.info(f"Combined products uploaded to {s3_key}")
 # 업데이트된 결과를 결합하여 S3에 업로드하는 함수
 def combine_and_upload_updated(ti):
     # 기존 제품 정보 가져오기

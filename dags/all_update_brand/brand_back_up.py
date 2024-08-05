@@ -1,192 +1,417 @@
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-
-from airflow.providers.postgres.hooks.postgres import PostgresHook
+import boto3
 import pandas as pd
 import io
-import random
-import string
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.webdriver.chrome.options import Options
+import time
+from airflow.hooks.S3_hook import S3Hook
 import logging
 
-# 스키마를 생성하는 함수
-def create_schema():
-    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
-    connection = redshift_hook.get_conn()
-    cursor = connection.cursor()
-    cursor.execute("CREATE SCHEMA IF NOT EXISTS otto;")
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-# 테이블을 생성하는 함수
-def create_tables():
-    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
-    connection = redshift_hook.get_conn()
-    cursor = connection.cursor()
-    cursor.execute("""
-    DROP TABLE IF EXISTS otto.reviews CASCADE;
-    DROP TABLE IF EXISTS otto.product_table CASCADE;
-
-    CREATE TABLE IF NOT EXISTS otto.product_table (
-        product_id varchar(max),
-        rank FLOAT,
-        product_name varchar(max) PRIMARY KEY,
-        category varchar(max),
-        price FLOAT,
-        image_url varchar(max),
-        description varchar(max),
-        color varchar(max),
-        size varchar(max),
-        platform varchar(max),
-        brand varchar(max),
-        UNIQUE (product_name)
-    );
-
-    CREATE TABLE IF NOT EXISTS otto.reviews (
-        review_id TEXT PRIMARY KEY,
-        product_name TEXT,
-        color TEXT,
-        size TEXT,
-        height TEXT,
-        gender TEXT,
-        weight TEXT,
-        top_size TEXT,
-        bottom_size TEXT,
-        size_comment TEXT,
-        quality_comment TEXT,
-        color_comment TEXT,
-        thickness_comment TEXT,
-        brightness_comment TEXT,
-        comment varchar(max),
-        FOREIGN KEY (product_name) REFERENCES otto.product_table (product_name)
-    );
-    """)
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-# S3에서 데이터를 읽고 데이터프레임으로 변환하는 함수
-def read_s3_to_dataframe(bucket_name, key):
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    s3_object = s3_hook.get_key(key, bucket_name)
-    s3_data = s3_object.get()['Body'].read().decode('utf-8')
-    data = pd.read_csv(io.StringIO(s3_data))
-    # 데이터 길이 로그 기록
-    logging.info(f"Read {len(data)} rows from {key}")
-    return data
-
-# 데이터베이스에 연결하여 데이터프레임으로 변환하는 함수
-def fetch_product_names():
-    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
-    sql = "SELECT product_name FROM otto.product_table"
-    connection = redshift_hook.get_conn()
-    return pd.read_sql(sql, connection)
-
-# 랜덤으로 고유한 review_id를 생성하는 함수
-def generate_unique_id():
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
-
-# S3에서 제품 데이터를 읽고 Redshift에 삽입하는 함수
-def upload_product_data(**kwargs):
-    bucket_name = 'otto-glue'
-    prefix_product = 'integrated-data/brand/'
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    files_product = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_product)
-    product_key = files_product[-1]
-    print(product_key)
-
-    # S3에서 제품 데이터를 읽음
-    product_df = read_s3_to_dataframe(bucket_name, product_key)
-    # rank 열에서 'none' 값을 0으로 변환하고 타입을 float로 변환
-    product_df['rank'] = product_df['rank'].replace('none', 0).astype(float)
-    # 가격 데이터 전처리
+# S3에서 데이터를 DataFrame으로 가져오는 함수
+def info_to_dataframe(bucket_name, file_key):
     try:
-        # 쉼표 제거 및 숫자로 변환
-        product_df['price'] = product_df['price'].astype(str).str.replace(',', '').astype(float)
+        # S3 객체 가져오기
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_object = s3_hook.get_key(file_key, bucket_name)
+
+        # S3 객체의 데이터를 읽어 DataFrame으로 변환
+        s3_data = s3_object.get()['Body'].read().decode('utf-8')
+        data = pd.read_csv(io.StringIO(s3_data))
+        logging.info(f"{file_key} 파일을 성공적으로 읽었습니다.")
+        return data
     except Exception as e:
-        print(f"Error processing price column: {e}")
-        product_df['price'] = 9000.0  # 오류 발생 시 기본값으로 9000.0 설정
+        logging.error(f"S3에서 {file_key}를 읽는 중 오류 발생: {e}")
+        return pd.DataFrame()
 
-    redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
-    connection = redshift_hook.get_conn()
-    cursor = connection.cursor()
-
-    for index, row in product_df.iterrows():
-        cursor.execute("SELECT 1 FROM otto.product_table WHERE product_name = %s", (row['product_name'],))
-        exists = cursor.fetchone()
-        if not exists:
-            cursor.execute("""
-                INSERT INTO otto.product_table (product_id, rank, product_name, category, price, image_url, description, color, size, platform,brand)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
-                """, tuple(row))
-    
-    connection.commit()
-    cursor.execute("SELECT COUNT(*) FROM otto.product_table")
-    product_count = cursor.fetchone()[0]
-    logging.info(f"Redshift product_table now contains {product_count} rows.")
-    cursor.close()
-    connection.close()
-    print(f"Inserted {len(product_df)} rows into otto.product_table")
-
-
-# S3에서 리뷰 데이터를 읽는 태스크
-def read_review_data(**kwargs):
+# S3에서 최신 old_product 데이터를 가져오는 함수
+def fetch_old_product_info():
     bucket_name = 'otto-glue'
+    prefix_old_product = 'integrated-data/products/'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    old_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_old_product)
+    old_product_key = old_product_file_list[-1]
+    logging.info(f"Old product file key: {old_product_key}")
+    return info_to_dataframe(bucket_name, old_product_key)
 
-    prefix_reviews = 'integrated-data/reviews/'
-    s3_hook = S3Hook(aws_conn_id='aws_default')       
-    files_reviews = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_reviews) 
-    review_key = files_reviews[-1]       
-    print(review_key)
+# S3에서 최신 new_product 데이터를 가져오는 함수
+def fetch_new_product_info():
+    bucket_name = 'otto-glue'
+    prefix_new_product = 'integrated-data/brand/'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    new_product_file_list = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix_new_product)
+    new_product_key = new_product_file_list[-1]
+    logging.info(f"New product file key: {new_product_key}")
+    
+    # DataFrame 로드 후 중복 제거
+    new_product_df = info_to_dataframe(bucket_name, new_product_key)
+    new_product_df.drop_duplicates(inplace=True)  # 중복 제거
+    logging.info("New product data 중복 제거 완료.")
+    
+    return new_product_df
 
+# 업데이트할 URL 목록을 준비하는 함수
+def prepare_update_urls(ti):
+    # old_product와 new_product 불러오기
+    old_product = fetch_old_product_info()
+    old_product.drop_duplicates(inplace=True)
+    new_product = fetch_new_product_info()
+    new_product.drop_duplicates(inplace=True)
     
     
-    
-    #review_key = 'integrated-data/reviews/combined_reviews_2024-07-29 08:38:46.040114.csv'
-    review_df = read_s3_to_dataframe(bucket_name, review_key)
-    kwargs['ti'].xcom_push(key='review_df', value=review_df.to_json())
+    logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
+    # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
+    if len(old_product) > len(new_product):
+        logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
 
-# Redshift에서 product_name 목록을 가져오는 태스크
-def get_existing_product_names(**kwargs):
-    existing_product_names_df = fetch_product_names()
-    kwargs['ti'].xcom_push(key='existing_product_names_df', value=existing_product_names_df.to_json())
+        # old_product와 new_product의 description 차집합을 계산하여 업데이트할 항목 결정
+        update_urls = old_product[~old_product['description'].isin(new_product['description'])]
 
-# 리뷰 데이터를 필터링하고 Redshift에 삽입하는 함수
-def process_and_upload_review_data(**kwargs):
-    ti = kwargs['ti']
-    review_df_json = ti.xcom_pull(key='review_df', task_ids='redshift_part.read_review_data')
-    
-    if review_df_json is None:
-        raise ValueError("No review data found in XCom.")
+        if len(update_urls) == 0:
+            logging.info("업데이트할 항목이 없습니다.")
+            return
 
-    review_df = pd.read_json(review_df_json)
-    existing_product_names_df = pd.read_json(ti.xcom_pull(key='existing_product_names_df', task_ids='redshift_part.get_existing_product_names'))
+        # 플랫폼별로 업데이트할 URL을 분리
+        musinsa_urls = update_urls[update_urls['platform'] == 'musinsa']['description'].tolist()
+        cm29_urls = update_urls[update_urls['platform'] == '29cm']['description'].tolist()
+        zigzag_urls = update_urls[update_urls['platform'] == 'zigzag']['description'].tolist()
 
-    # product_name이 존재하는 리뷰만 필터링
-    new_reviews_df = review_df[review_df['product_name'].isin(existing_product_names_df['product_name'])]
-
-    if not new_reviews_df.empty:
-        redshift_hook = PostgresHook(postgres_conn_id='otto_redshift')
-        connection = redshift_hook.get_conn()
-        cursor = connection.cursor()
-
-        for index, row in new_reviews_df.iterrows():
-            cursor.execute("SELECT 1 FROM otto.reviews WHERE review_id = %s", (generate_unique_id(),))
-            exists = cursor.fetchone()
-            if not exists:
-                cursor.execute("""
-                    INSERT INTO otto.reviews (review_id, product_name, color, size, height, gender, weight, top_size, bottom_size, size_comment, quality_comment, color_comment, thickness_comment, brightness_comment, comment)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
-        
-        connection.commit()
-        # Redshift reviews 테이블의 길이 로그 기록
-        cursor.execute("SELECT COUNT(*) FROM otto.reviews")
-        review_count = cursor.fetchone()[0]
-        logging.info(f"Redshift reviews table now contains {review_count} rows.")
-        cursor.close()
-        connection.close()
-        print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
+        # XCom에 업데이트할 URL 목록 저장
+        ti.xcom_push(key='musinsa_update_urls', value=musinsa_urls)
+        ti.xcom_push(key='cm29_update_urls', value=cm29_urls)
+        ti.xcom_push(key='zigzag_update_urls', value=zigzag_urls)
     else:
-        print("No new reviews to insert.")
+        logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
+        return
 
 
+# Musinsa 플랫폼의 데이터를 처리하는 함수
+def process_musinsa_products(ti):
+    old_product = fetch_old_product_info()
+    musinsa_products = old_product[old_product['platform'] == 'musinsa']
+    brand_info = []
+    urls = musinsa_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(1)  # 페이지 로드를 위한 대기 시간
+
+        brand_found = False
+        # XPath 순회
+        for j in range(11, 18):
+            for z in range(2, 5):
+                try:
+                    # 브랜드 정보를 찾고 추가
+                    brand_musinsa = driver.find_element(By.XPATH, f'//*[@id="root"]/div[{j}]/div[{z}]/dl[1]/dd/a').text
+                    logging.info(f"브랜드: {brand_musinsa}, 플랫폼: musinsa")
+                    brand_info.append({'description': URL, 'brand': brand_musinsa, 'platform': 'musinsa'})
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 내부 루프 종료
+                except NoSuchElementException:
+                    continue  # 현재 XPath에서 요소를 찾을 수 없는 경우 다음으로 넘어감
+                except Exception as e:
+                    logging.error(f"예상치 못한 오류 발생: {str(e)}")
+                    break
+            
+            if brand_found:
+                break  # 외부 루프 종료
+        
+        if not brand_found:
+            logging.info("브랜드 정보 없음")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': 'musinsa'})
+
+    driver.quit()
+    # XCom에 데이터 저장
+    ti.xcom_push(key='musinsa_products', value=brand_info)
+
+# 29cm 플랫폼의 데이터를 처리하는 함수
+def process_29cm_products(ti):
+    old_product = fetch_old_product_info()
+    cm29_products = old_product[old_product['platform'] == '29cm']
+    brand_info = []
+    urls = cm29_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(1)
+
+        try:
+            brand_29cm = driver.find_element(By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3').text
+            logging.info(f"브랜드: {brand_29cm}, 플랫폼: 29cm")
+            brand_info.append({'description': URL, 'brand': brand_29cm, 'platform': '29cm'})
+        except NoSuchElementException:
+            logging.info("브랜드 정보 없음")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': '29cm'})
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': '29cm'})
+
+    driver.quit()
+    # XCom에 데이터 저장
+    ti.xcom_push(key='cm29_products', value=brand_info)
+
+# zigzag 플랫폼의 데이터를 처리하는 함수
+def process_zigzag_products(ti):
+    old_product = fetch_old_product_info()
+    zigzag_products = old_product[old_product['platform'] == 'zigzag']
+    brand_info = []
+    urls = zigzag_products['description'].tolist()
+    
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+    wait = WebDriverWait(driver, 15)  # 대기 시간을 15초로 설정
+
+    for URL in urls:
+        driver.get(URL)
+        time.sleep(2)  # 페이지 로드를 위한 대기 시간
+
+        try:
+            # 지정된 XPath를 클릭
+            brand_found = False
+            for xpath in ['//*[@id="__next"]/div[1]/div/div/div[11]/div/div/div/div/div[2]/div[1]/h2',
+                          '//*[@id="__next"]/div[1]/div/div/div[12]/div/div/div/div/div[2]/div[1]/h2']:
+                try:
+                    brand_zigzag = driver.find_element(By.XPATH, xpath).text
+                    logging.info(f"브랜드: {brand_zigzag}, 플랫폼: zigzag")
+                    brand_info.append({'description': URL, 'brand': brand_zigzag, 'platform': 'zigzag'})
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 반복 종료
+                except NoSuchElementException:
+                    continue
+            
+            if not brand_found:
+                # 어떤 xpath에서도 브랜드 정보를 찾지 못한 경우
+                logging.info("브랜드 정보 없음")
+                brand_info.append({'description': URL, 'brand': "none", 'platform': 'zigzag'})
+
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': 'zigzag'})
+
+    driver.quit()  # 드라이버 종료
+    # XCom에 데이터 저장
+    ti.xcom_push(key='zigzag_products', value=brand_info)
+
+# Musinsa 플랫폼의 업데이트를 처리하는 함수
+def update_musinsa_crawling(ti):
+    update_urls = ti.xcom_pull(key='musinsa_update_urls', task_ids='prepare_update_urls_task')
+    brand_info = []
+
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+
+    for URL in update_urls:
+        driver.get(URL)
+        time.sleep(1)  # 페이지 로드를 위한 대기 시간
+
+        brand_found = False
+        # XPath 순회
+        for j in range(11, 18):
+            for z in range(2, 5):
+                try:
+                    # 브랜드 정보를 찾고 추가
+                    brand_musinsa = driver.find_element(By.XPATH, f'//*[@id="root"]/div[{j}]/div[{z}]/dl[1]/dd/a').text
+                    logging.info(f"브랜드: {brand_musinsa}, 플랫폼: musinsa")
+                    brand_info.append({'description': URL, 'brand': brand_musinsa, 'platform': 'musinsa'})
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 내부 루프 종료
+                except NoSuchElementException:
+                    continue  # 현재 XPath에서 요소를 찾을 수 없는 경우 다음으로 넘어감
+                except Exception as e:
+                    logging.error(f"예상치 못한 오류 발생: {str(e)}")
+                    break
+            
+            if brand_found:
+                break  # 외부 루프 종료
+        
+        if not brand_found:
+            logging.info("브랜드 정보 없음")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': 'musinsa'})
+
+    driver.quit()
+    # XCom에 데이터 저장
+    ti.xcom_push(key='musinsa_update_info', value=brand_info)
+
+# 29cm 플랫폼의 업데이트를 처리하는 함수
+def update_29cm_crawling(ti):
+    update_urls = ti.xcom_pull(key='cm29_update_urls', task_ids='prepare_update_urls_task')
+    brand_info = []
+
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+
+    for URL in update_urls:
+        driver.get(URL)
+        time.sleep(1)
+
+        try:
+            brand_29cm = driver.find_element(By.XPATH, '//*[@id="__next"]/div[5]/div[1]/div/a/div/h3').text
+            logging.info(f"브랜드: {brand_29cm}, 플랫폼: 29cm")
+            brand_info.append({'description': URL, 'brand': brand_29cm, 'platform': '29cm'})
+        except NoSuchElementException:
+            logging.info("브랜드 정보 없음")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': '29cm'})
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': '29cm'})
+
+    driver.quit()
+    # XCom에 데이터 저장
+    ti.xcom_push(key='cm29_update_info', value=brand_info)
+
+# zigzag 플랫폼의 업데이트를 처리하는 함수
+def update_zigzag_crawling(ti):
+    update_urls = ti.xcom_pull(key='zigzag_update_urls', task_ids='prepare_update_urls_task')
+    brand_info = []
+
+    service = Service('/usr/local/bin/chromedriver')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(service=service, options=options)
+    wait = WebDriverWait(driver, 15)  # 대기 시간을 15초로 설정
+
+    for URL in update_urls:
+        driver.get(URL)
+        time.sleep(2)  # 페이지 로드를 위한 대기 시간
+
+        try:
+            # 지정된 XPath를 클릭
+            brand_found = False
+            for xpath in ['//*[@id="__next"]/div[1]/div/div/div[11]/div/div/div/div/div[2]/div[1]/h2',
+                          '//*[@id="__next"]/div[1]/div/div/div[12]/div/div/div/div/div[2]/div[1]/h2']:
+                try:
+                    brand_zigzag = driver.find_element(By.XPATH, xpath).text
+                    logging.info(f"브랜드: {brand_zigzag}, 플랫폼: zigzag")
+                    brand_info.append({'description': URL, 'brand': brand_zigzag, 'platform': 'zigzag'})
+                    brand_found = True
+                    break  # 성공적으로 찾았으면 반복 종료
+                except NoSuchElementException:
+                    continue
+            
+            if not brand_found:
+                # 어떤 xpath에서도 브랜드 정보를 찾지 못한 경우
+                logging.info("브랜드 정보 없음")
+                brand_info.append({'description': URL, 'brand': "none", 'platform': 'zigzag'})
+
+        except Exception as e:
+            logging.error(f"예상치 못한 오류 발생: {str(e)}")
+            brand_info.append({'description': URL, 'brand': "none", 'platform': 'zigzag'})
+
+    driver.quit()  # 드라이버 종료
+    # XCom에 데이터 저장
+    ti.xcom_push(key='zigzag_update_info', value=brand_info)
+
+# 결과를 결합하여 S3에 업로드하는 함수
+def combine_and_upload(ti):
+    # 기존 제품 정보 가져오기.
+    old_product = fetch_old_product_info()
+    
+    # XCom에서 병렬 처리된 플랫폼별 제품 데이터를 가져옴
+    musinsa_products = ti.xcom_pull(key='musinsa_products', task_ids='process_musinsa_products')
+    cm29_products = ti.xcom_pull(key='cm29_products', task_ids='process_29cm_products')
+    zigzag_products = ti.xcom_pull(key='zigzag_products', task_ids='process_zigzag_products')
+    
+    # XCom에서 가져온 데이터를 데이터프레임으로 변환
+    musinsa_df = pd.DataFrame(musinsa_products)
+    cm29_df = pd.DataFrame(cm29_products)
+    zigzag_df = pd.DataFrame(zigzag_products)
+
+    # 기존 데이터프레임과 새로 크롤링된 데이터를 병합
+    # description과 URL을 기준으로 브랜드 정보를 병합
+    combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
+
+    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
+    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
+    new_product_df = new_product_df.drop_duplicates()
+
+    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
+    csv_buffer = io.StringIO()
+    new_product_df.to_csv(csv_buffer, index=False)
+
+    # S3에 CSV 파일을 업로드
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    
+    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
+    s3_hook.load_string(
+        csv_buffer.getvalue(),
+        key=s3_key,
+        bucket_name=bucket_name,
+        replace=True  # 덮어쓰기 옵션
+    )
+    
+    logging.info(f"Combined products uploaded to {s3_key}")
+
+# 업데이트된 결과를 결합하여 S3에 업로드하는 함수
+def combine_and_upload_updated(ti):
+    # 기존 제품 정보 가져오기.
+    old_product = fetch_old_product_info()
+    
+    # XCom에서 병렬 처리된 플랫폼별 업데이트된 제품 데이터를 가져옴
+    musinsa_update_info = ti.xcom_pull(key='musinsa_update_info', task_ids='update_musinsa_crawling')
+    cm29_update_info = ti.xcom_pull(key='cm29_update_info', task_ids='update_29cm_crawling')
+    zigzag_update_info = ti.xcom_pull(key='zigzag_update_info', task_ids='update_zigzag_crawling')
+    
+    # XCom에서 가져온 데이터를 데이터프레임으로 변환
+    musinsa_df = pd.DataFrame(musinsa_update_info)
+    cm29_df = pd.DataFrame(cm29_update_info)
+    zigzag_df = pd.DataFrame(zigzag_update_info)
+
+    # 기존 데이터프레임과 새로 크롤링된 데이터를 병합
+    # description과 URL을 기준으로 브랜드 정보를 병합
+    combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
+
+    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
+    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
+    new_product_df = new_product_df.drop_duplicates()
+    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
+    csv_buffer = io.StringIO()
+    new_product_df.to_csv(csv_buffer, index=False)
+
+    # S3에 CSV 파일을 업로드
+    bucket_name = 'otto-glue'
+    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+    s3_hook = S3Hook(aws_conn_id='aws_default')
+    
+    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
+    s3_hook.load_string(
+        csv_buffer.getvalue(),
+        key=s3_key,
+        bucket_name=bucket_name,
+        replace=True  # 덮어쓰기 옵션
+    )
+    
+    logging.info(f"Combined updated products uploaded to {s3_key}")
