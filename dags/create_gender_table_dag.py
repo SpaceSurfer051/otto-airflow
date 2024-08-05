@@ -1,11 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-import logging
 
 
-from create_gender_table_task import fetch_data_from_redshift
 from create_gender_table_task import create_gender_df
+from create_gender_table_task import fetch_data_from_redshift
+from create_gender_table_task import upload_gender_table_to_redshift
 
 default_args = {
     "owner": "airflow",
@@ -22,15 +22,9 @@ dag = DAG(
 
 
 def fetch_and_process_data(**kwargs):
-    # product_df = fetch_data_from_redshift("proudct_table")
-    # reviews_df = fetch_data_from_redshift("reviews")
     product_df, reviews_df = fetch_data_from_redshift()
     gender_df = create_gender_df(product_df, reviews_df)
-    logging.info(gender_df)
-
-
-def upload_ml_data(**kwargs):
-    pass
+    upload_gender_table_to_redshift(gender_df)
 
 
 with dag:
