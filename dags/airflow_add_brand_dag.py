@@ -106,23 +106,28 @@ def check_file_exists():
         return 'process_zigzag_products'
 
 # 업데이트할 URL 목록 준비 태스크
+# 업데이트 여부 결정 태스크 정의
 def branch_update_decision(ti):
     old_product = fetch_old_product_info()
     new_product = fetch_new_product_info()
+
+    logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
 
     # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
     if len(old_product) > len(new_product):
         logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
         update_urls = prepare_update_urls(ti)
         
-        if not update_urls:
-            logging.info("업데이트할 항목이 없습니다.")
-            return 'skip_update_tasks'
-        else:
+        # update_urls가 None이 아니라면, prepare_update_urls_task를 실행
+        if update_urls is not None and len(update_urls) > 0:
             return 'prepare_update_urls_task'
+        else:
+            logging.info("업데이트할 항목이 없습니다. 모든 태스크를 건너뜁니다.")
+            return 'skip_update_tasks'
     else:
         logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
         return 'skip_update_tasks'
+
 
 # DAG 정의
 dag = DAG(

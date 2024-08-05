@@ -67,7 +67,7 @@ def prepare_update_urls(ti):
         # old_product와 new_product의 description 차집합을 계산하여 업데이트할 항목 결정
         update_urls = old_product[~old_product['description'].isin(new_product['description'])]
 
-        if update_urls.empty:
+        if len(update_urls) == 0:
             logging.info("업데이트할 항목이 없습니다.")
             return
 
