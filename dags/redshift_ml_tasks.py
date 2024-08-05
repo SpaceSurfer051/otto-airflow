@@ -33,7 +33,6 @@ def process_data(products_df, reviews_df):
             index = size_list.index(row["size"])
             if row["size_comment"] == "작아요":
                 logging.info("작아요")
-                print("작아요")
                 return (
                     size_list[index + 1]
                     if index + 1 < len(size_list)
@@ -41,15 +40,11 @@ def process_data(products_df, reviews_df):
                 )
             elif row["size_comment"] == "커요":
                 logging.info("커요")
-                print("커요")
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
                 logging.info("잘 맞아요")
-                print("잘 맞아요")
-                return size_list[index]
+                return size_list[index - 1] if index > 0 else size_list[index]
         except ValueError:
-            logging.info("except")
-            print("except")
             return row["size"]
 
     # Generating size recommendations
