@@ -107,16 +107,26 @@ def check_file_exists():
 
 # 업데이트할 URL 목록 준비 태스크
 def branch_update_decision(ti):
-    update_urls = prepare_update_urls(ti)
-    
-    if not update_urls:
-        return 'skip_update_tasks'
+    old_product = fetch_old_product_info()
+    new_product = fetch_new_product_info()
+
+    # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
+    if len(old_product) > len(new_product):
+        logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
+        update_urls = prepare_update_urls(ti)
+        
+        if not update_urls:
+            logging.info("업데이트할 항목이 없습니다.")
+            return 'skip_update_tasks'
+        else:
+            return 'prepare_update_urls_task'
     else:
-        return 'prepare_update_urls_task'
+        logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
+        return 'skip_update_tasks'
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v11_1',
+    'process_brand_info_dag_v11_3',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',
