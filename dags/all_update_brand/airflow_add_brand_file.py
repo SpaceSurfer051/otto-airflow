@@ -56,25 +56,34 @@ def fetch_new_product_info():
 
 # 업데이트할 URL 목록을 준비하는 함수
 def prepare_update_urls(ti):
+    # old_product와 new_product 불러오기
     old_product = fetch_old_product_info()
     new_product = fetch_new_product_info()
 
-    # old_product와 new_product의 description 차집합을 계산하여 업데이트할 항목 결정
-    update_urls = old_product[~old_product['description'].isin(new_product['description'])]
+    # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
+    if len(old_product) > len(new_product):
+        logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
 
-    if update_urls.empty:
-        logging.info("업데이트할 항목이 없습니다.")
+        # old_product와 new_product의 description 차집합을 계산하여 업데이트할 항목 결정
+        update_urls = old_product[~old_product['description'].isin(new_product['description'])]
+
+        if update_urls.empty:
+            logging.info("업데이트할 항목이 없습니다.")
+            return
+
+        # 플랫폼별로 업데이트할 URL을 분리
+        musinsa_urls = update_urls[update_urls['platform'] == 'musinsa']['description'].tolist()
+        cm29_urls = update_urls[update_urls['platform'] == '29cm']['description'].tolist()
+        zigzag_urls = update_urls[update_urls['platform'] == 'zigzag']['description'].tolist()
+
+        # XCom에 업데이트할 URL 목록 저장
+        ti.xcom_push(key='musinsa_update_urls', value=musinsa_urls)
+        ti.xcom_push(key='cm29_update_urls', value=cm29_urls)
+        ti.xcom_push(key='zigzag_update_urls', value=zigzag_urls)
+    else:
+        logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
         return
 
-    # 플랫폼별로 업데이트할 URL을 분리
-    musinsa_urls = update_urls[update_urls['platform'] == 'musinsa']['description'].tolist()
-    cm29_urls = update_urls[update_urls['platform'] == '29cm']['description'].tolist()
-    zigzag_urls = update_urls[update_urls['platform'] == 'zigzag']['description'].tolist()
-
-    # XCom에 업데이트할 URL 목록 저장
-    ti.xcom_push(key='musinsa_update_urls', value=musinsa_urls)
-    ti.xcom_push(key='cm29_update_urls', value=cm29_urls)
-    ti.xcom_push(key='zigzag_update_urls', value=zigzag_urls)
 
 # Musinsa 플랫폼의 데이터를 처리하는 함수
 def process_musinsa_products(ti):
