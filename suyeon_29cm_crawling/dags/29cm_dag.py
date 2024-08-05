@@ -142,7 +142,7 @@ def get_reviews(driver, product_name, review_data, gender):
             review_data["gender"].append(gender)
 
             color_match = re.search(r"\[(Color|color|컬러)\](.*?)\[", option)
-            size_match = re.search(r"\[(Size|size|사이즈)\](.*?)\,", option)
+            size_match = re.search(r"\[(Size|size|사이즈|SIZE)\](.*?)\,", option)
 
             color = color_match.group(2).strip() if color_match else "none"
             size = size_match.group(2).strip() if size_match else "none"
