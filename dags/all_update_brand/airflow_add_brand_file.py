@@ -62,7 +62,6 @@ def prepare_update_urls(ti):
     new_product = fetch_new_product_info()
     new_product.drop_duplicates(inplace=True)
     
-    
     logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
     # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
     if len(old_product) > len(new_product):
@@ -87,7 +86,6 @@ def prepare_update_urls(ti):
     else:
         logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
         return
-
 
 # Musinsa 플랫폼의 데이터를 처리하는 함수
 def process_musinsa_products(ti):
@@ -333,58 +331,16 @@ def update_zigzag_crawling(ti):
     # XCom에 데이터 저장
     ti.xcom_push(key='zigzag_update_info', value=brand_info)
 
-# 결과를 결합하여 S3에 업로드하는 함수
-def combine_and_upload(ti):
-    # 기존 제품 정보 가져오기.
-    old_product = fetch_old_product_info()
-    
-    # XCom에서 병렬 처리된 플랫폼별 제품 데이터를 가져옴
-    musinsa_products = ti.xcom_pull(key='musinsa_products', task_ids='process_musinsa_products')
-    cm29_products = ti.xcom_pull(key='cm29_products', task_ids='process_29cm_products')
-    zigzag_products = ti.xcom_pull(key='zigzag_products', task_ids='process_zigzag_products')
-    
-    # XCom에서 가져온 데이터를 데이터프레임으로 변환
-    musinsa_df = pd.DataFrame(musinsa_products)
-    cm29_df = pd.DataFrame(cm29_products)
-    zigzag_df = pd.DataFrame(zigzag_products)
-
-    # 기존 데이터프레임과 새로 크롤링된 데이터를 병합
-    # description과 URL을 기준으로 브랜드 정보를 병합
-    combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
-
-    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
-    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
-    new_product_df = new_product_df.drop_duplicates()
-
-    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
-    csv_buffer = io.StringIO()
-    new_product_df.to_csv(csv_buffer, index=False)
-
-    # S3에 CSV 파일을 업로드
-    bucket_name = 'otto-glue'
-    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    
-    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
-    s3_hook.load_string(
-        csv_buffer.getvalue(),
-        key=s3_key,
-        bucket_name=bucket_name,
-        replace=True  # 덮어쓰기 옵션
-    )
-    
-    logging.info(f"Combined products uploaded to {s3_key}")
-
 # 업데이트된 결과를 결합하여 S3에 업로드하는 함수
 def combine_and_upload_updated(ti):
-    # 기존 제품 정보 가져오기.
+    # 기존 제품 정보 가져오기
     old_product = fetch_old_product_info()
-    
+
     # XCom에서 병렬 처리된 플랫폼별 업데이트된 제품 데이터를 가져옴
     musinsa_update_info = ti.xcom_pull(key='musinsa_update_info', task_ids='update_musinsa_crawling')
     cm29_update_info = ti.xcom_pull(key='cm29_update_info', task_ids='update_29cm_crawling')
     zigzag_update_info = ti.xcom_pull(key='zigzag_update_info', task_ids='update_zigzag_crawling')
-    
+
     # XCom에서 가져온 데이터를 데이터프레임으로 변환
     musinsa_df = pd.DataFrame(musinsa_update_info)
     cm29_df = pd.DataFrame(cm29_update_info)
@@ -394,24 +350,32 @@ def combine_and_upload_updated(ti):
     # description과 URL을 기준으로 브랜드 정보를 병합
     combined_df = pd.concat([musinsa_df, cm29_df, zigzag_df], ignore_index=True)
 
-    # 여기서는 description 컬럼을 기준으로 merge를 수행하니까, 결과가 정렬되서 나옴.
-    new_product_df = pd.merge(old_product, combined_df[['description', 'brand']], on='description', how='left')
-    new_product_df = new_product_df.drop_duplicates()
-    # DataFrame을 CSV 형식으로 변환 (io.StringIO는 local에 저장되는게 아니라 저 파일이 버퍼에 저장이 되는거)
-    csv_buffer = io.StringIO()
-    new_product_df.to_csv(csv_buffer, index=False)
+    # 업데이트된 정보가 있는 경우에만 처리
+    if not combined_df.empty:
+        # 기존 old_product에서 업데이트된 description을 가진 행을 삭제
+        old_product = old_product[~old_product['description'].isin(combined_df['description'])]
 
-    # S3에 CSV 파일을 업로드
-    bucket_name = 'otto-glue'
-    s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
-    s3_hook = S3Hook(aws_conn_id='aws_default')
-    
-    # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
-    s3_hook.load_string(
-        csv_buffer.getvalue(),
-        key=s3_key,
-        bucket_name=bucket_name,
-        replace=True  # 덮어쓰기 옵션
-    )
-    
-    logging.info(f"Combined updated products uploaded to {s3_key}")
+        # 새로운 정보와 기존 정보를 합침
+        new_product_df = pd.concat([old_product, combined_df], ignore_index=True)
+        new_product_df.drop_duplicates(inplace=True)
+
+        # DataFrame을 CSV 형식으로 변환
+        csv_buffer = io.StringIO()
+        new_product_df.to_csv(csv_buffer, index=False)
+
+        # S3에 CSV 파일을 업로드
+        bucket_name = 'otto-glue'
+        s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
+        s3_hook = S3Hook(aws_conn_id='aws_default')
+        
+        # 이미 존재하는 S3 파일을 덮어씌우도록 replace=True 옵션을 사용
+        s3_hook.load_string(
+            csv_buffer.getvalue(),
+            key=s3_key,
+            bucket_name=bucket_name,
+            replace=True  # 덮어쓰기 옵션
+        )
+        
+        logging.info(f"Combined updated products uploaded to {s3_key}")
+    else:
+        logging.info("No updated information found to merge.")

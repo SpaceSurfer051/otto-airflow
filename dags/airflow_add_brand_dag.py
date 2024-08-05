@@ -79,9 +79,7 @@ v11
     - 문제 원인 파악 결과, 지속적인 테스트를 위한 dag 호출 결과 key-value 형태로 구성된 xcom에서 여러 데이터를 가져오는 문제 확인
     - xcom 문제가 아닌 것 같음. 그냥 중복제거 처리함.
     - 그냥 중복제거로 처리 (product table 갯수 446개)
-    
-    v11_1
-        - new_product를 불러올 때
+
     
 '''
 # XCom 데이터 초기화 함수
@@ -231,8 +229,12 @@ combine_and_upload_task = PythonOperator(
 )
 
 # Task dependencies 설정
+
 clear_xcom_start >> branching_task
 branching_task >> [prepare_update_urls_task, process_zigzag_task, skip_update_tasks]
 prepare_update_urls_task >> [update_musinsa_task, update_29cm_task, update_zigzag_task] >> combine_and_upload_updated_task
 process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
-[combine_and_upload_updated_task, combine_and_upload_task, skip_update_tasks] >> clear_xcom_end
+
+
+#process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
+
