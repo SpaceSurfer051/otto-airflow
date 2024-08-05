@@ -29,7 +29,7 @@ def fetch_and_process_data(**kwargs):
 
 
 def upload_to_rds(**kwargs):
-    upload_gender_table_to_redshift()
+    upload_gender_table_to_rds()
 
 
 with dag:
