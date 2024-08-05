@@ -20,62 +20,7 @@ from all_update_brand.airflow_add_brand_file import (
     fetch_new_product_info,    
 )
 from datetime import timedelta
-'''
 
-v5
- - musinsa, 29cm에서 브랜드를 긁어오고, print해보게끔 함. zigzag는 나중에 하기.
-
-
-v6
- - musinsa에서 예외가 되는 부분을 발견함 이 부분을 수정함.
- - 29cm에서 예외처리를 추가해줬음.
- - musinsa와 29cm에서 예외처리를 추가해줬음.
- - 결합 전 old_product와 brand_info 길이가 같아야 추가할 수 있음. 그러니 길이가 같은지 테스트부터 진행.
- 
-v7
- - zigzag crawling start
- - create combind both old_data_frame(old_product) and brand_info
- - modify dag
- 
-v8
- - 3가지 플랫폼에서 데이터 수집 후 데이터 프레임으로 합친 이후, csv파일로 저장하는 부분 추가
- 
- 
-v9
- - 29cm,musinsa,zigzag를 3개의 task로 분리하고 병렬로 처리한 이후, 결합하여 s3에 올리는 구조
- - 실험결과
-   - driver.find_element(By.XPATH, xpath).text 로 가져오는게 제일 빠름.
-   - 결과를 근거로, 코드에 적용 (초기 코드 실행 결과 32분 나옴, local airflow 기준)
-   - 향후 작업 방안
-        - 옷 상세 정보도 가져와보기
-        - 브랜드 정보가 이미 s3에 있으면 그거 가져와서 시간 단축하는 구조로 만들기
-        
-        
-    v9_1
-    - local 테스트 결과 이상 없었으나, 클라우드 환경에서 진행하니 리소스 부족으로 task가 up_for_retry 상태에 빠짐
-        - 원인 파악 결과, signal 15가 호출되어 task가 비정상 종료가 되었고, 이는 리소스 부족으로 추측
-        -(https://stackoverflow.com/questions/77096452/gunicorn-worker-getting-exit-in-airflow-web-server-with-received-signal-15-clo)
-        - 리소스 최적화를 위해 병렬처리는 일단 보류
-        
-v10
- - local 환경에서 테스트를 하며 brand가 추가된 csv 파일이 현재 s3://integrated-data/brand/ 아래에 존재함.
- - 이를 활용하여 이미 존재하면 True, 존재하지 않으면 False로 접근하고자 함.(분기 처리)
-    
-    v10_1
-        - 분기처리하여, update하는 코드를 추가 했음.
-    v10_3
-        - update할만한 데이터가 없으면 모든 task가 종료
-        
-v11
- - 데이터가 예상치 못하게 중복저장 되는 중.
-    - 문제 원인 파악 결과, 지속적인 테스트를 위한 dag 호출 결과 key-value 형태로 구성된 xcom에서 여러 데이터를 가져오는 문제 확인
-    - xcom 문제가 아닌 것 같음. 그냥 중복제거 처리함.
-    - 그냥 중복제거로 처리 (product table 갯수 446개)
-    
-    v11_1
-        - new_product를 불러올 때
-    
-'''
 # 기본 설정
 default_args = {
     'owner': 'airflow',
@@ -115,10 +60,10 @@ def check_file_and_decide_update(ti):
             logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
             
             # 업데이트할 URL을 준비합니다.
-            update_urls = prepare_update_urls()
+            update_urls = prepare_update_urls(ti)
             
             # update_urls가 None이 아니고, 비어있지 않으면 업데이트 진행
-            if len(update_urls) > 0:
+            if update_urls is not None and len(update_urls) > 0:
                 return 'prepare_update_urls_task'
             else:
                 logging.info("업데이트할 항목이 없습니다. 모든 태스크를 건너뜁니다.")
