@@ -116,7 +116,7 @@ def branch_update_decision(ti):
 
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v11_2',
+    'process_brand_info_dag_v11_1',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',
