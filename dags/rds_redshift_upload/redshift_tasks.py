@@ -5,6 +5,7 @@ import pandas as pd
 import io
 import random
 import string
+import logging
 
 # 스키마를 생성하는 함수
 def create_schema():
@@ -69,6 +70,8 @@ def read_s3_to_dataframe(bucket_name, key):
     s3_object = s3_hook.get_key(key, bucket_name)
     s3_data = s3_object.get()['Body'].read().decode('utf-8')
     data = pd.read_csv(io.StringIO(s3_data))
+    # 데이터 길이 로그 기록
+    logging.info(f"Read {len(data)} rows from {key}")
     return data
 
 # 데이터베이스에 연결하여 데이터프레임으로 변환하는 함수
@@ -117,6 +120,9 @@ def upload_product_data(**kwargs):
                 """, tuple(row))
     
     connection.commit()
+    cursor.execute("SELECT COUNT(*) FROM otto.product_table")
+    product_count = cursor.fetchone()[0]
+    logging.info(f"Redshift product_table now contains {product_count} rows.")
     cursor.close()
     connection.close()
     print(f"Inserted {len(product_df)} rows into otto.product_table")
@@ -173,6 +179,10 @@ def process_and_upload_review_data(**kwargs):
                     """, (generate_unique_id(), row['product_name'], row['color'], row['size'], row['height'], row['gender'], row['weight'], row['top_size'], row['bottom_size'], row['size_comment'], row['quality_comment'], row['color_comment'], row['thickness_comment'], row['brightness_comment'], row['comment']))
         
         connection.commit()
+        # Redshift reviews 테이블의 길이 로그 기록
+        cursor.execute("SELECT COUNT(*) FROM otto.reviews")
+        review_count = cursor.fetchone()[0]
+        logging.info(f"Redshift reviews table now contains {review_count} rows.")
         cursor.close()
         connection.close()
         print(f"Inserted {len(new_reviews_df)} new rows into otto.reviews")
