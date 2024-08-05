@@ -59,7 +59,7 @@ def prepare_update_urls(ti):
     # old_product와 new_product 불러오기
     old_product = fetch_old_product_info()
     new_product = fetch_new_product_info()
-
+    logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
     # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
     if len(old_product) > len(new_product):
         logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
