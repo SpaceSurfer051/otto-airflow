@@ -33,8 +33,8 @@ def upload_gender_table_to_redshift(df):
 
     cursor.execute(
         """
-        DROP TABLE IF EXISTS otto.gender CASCADE;
-        CREATE TABLE IF NOT EXISTS otto.gender (
+        DROP TABLE IF EXISTS otto.gender_table CASCADE;
+        CREATE TABLE IF NOT EXISTS otto.gender_table (
             product_name TEXT,
             gender TEXT
         );
