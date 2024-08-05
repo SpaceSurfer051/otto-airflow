@@ -17,7 +17,7 @@ default_args = {
 dag = DAG(
     "otto_redshift_to_ml_table",
     default_args=default_args,
-    description="Redshift에서 데이터를 가져와 Pandas로 처리한 후 ML 테이블 생성22",
+    description="Redshift에서 데이터를 가져와 Pandas로 처리한 후 ML 테이블 생성",
     schedule_interval=None,
 )
 
