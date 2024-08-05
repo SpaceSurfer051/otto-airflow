@@ -105,9 +105,17 @@ def upload_ml_table_to_redshift(ml_df):
         cursor.execute(
             """
             INSERT INTO otto.ml_table (product_name, gender, size, height, weight, size_comment, size_recommend)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
-            tuple(row),
+            (
+                row["product_name"],
+                row["gender"],
+                row["size"],
+                row["height"],
+                row["weight"],
+                row["size_comment"],
+                row["size_recommend"],
+            ),
         )
 
     connection.commit()
