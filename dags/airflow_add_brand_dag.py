@@ -19,7 +19,7 @@ from all_update_brand.airflow_add_brand_file import (
 )
 from datetime import timedelta
 '''
-패치내역
+
 v5
  - musinsa, 29cm에서 브랜드를 긁어오고, print해보게끔 함. zigzag는 나중에 하기.
 
@@ -90,8 +90,9 @@ def clear_xcom_data(session: SQLASession = None, **context):
     session.commit()
     logging.info("XCom data cleared")
 
-# CSV 파일 존재 여부 확인 함수
-def check_file_exists():
+# CSV 파일 존재 여부 및 업데이트 여부 결정 함수
+def check_file_and_decide_update(ti):
+    # 파일이 S3에 있는지 확인
     bucket_name = 'otto-glue'
     s3_key = 'integrated-data/brand/combined_products_with_brands.csv'
     
@@ -100,38 +101,36 @@ def check_file_exists():
     
     if s3_key in keys:
         logging.info(f"File {s3_key} exists.")
-        return 'prepare_update_urls_task'
+        
+        # old_product와 new_product 데이터를 가져옵니다.
+        old_product = fetch_old_product_info()
+        new_product = fetch_new_product_info()
+        
+        logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
+
+        # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
+        if len(old_product) > len(new_product):
+            logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
+            
+            # 업데이트할 URL을 준비합니다.
+            update_urls = prepare_update_urls(ti)
+            
+            # update_urls가 None이 아니고, 비어있지 않으면 업데이트 진행
+            if update_urls is not None and len(update_urls) > 0:
+                return 'prepare_update_urls_task'
+            else:
+                logging.info("업데이트할 항목이 없습니다. 모든 태스크를 건너뜁니다.")
+                return 'skip_update_tasks'
+        else:
+            logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
+            return 'skip_update_tasks'
     else:
         logging.info(f"File {s3_key} does not exist.")
         return 'process_zigzag_products'
 
-# 업데이트할 URL 목록 준비 태스크
-# 업데이트 여부 결정 태스크 정의
-def branch_update_decision(ti):
-    old_product = fetch_old_product_info()
-    new_product = fetch_new_product_info()
-
-    logging.info(f"Old product count: {len(old_product)}, New product count: {len(new_product)}")
-
-    # old_product가 new_product보다 더 많은 행을 가지고 있는지 확인
-    if len(old_product) > len(new_product):
-        logging.info("old_product가 new_product보다 많은 행을 가지고 있습니다. 업데이트를 진행합니다.")
-        update_urls = prepare_update_urls(ti)
-        
-        # update_urls가 None이 아니라면, prepare_update_urls_task를 실행
-        if update_urls is not None and len(update_urls) > 0:
-            return 'prepare_update_urls_task'
-        else:
-            logging.info("업데이트할 항목이 없습니다. 모든 태스크를 건너뜁니다.")
-            return 'skip_update_tasks'
-    else:
-        logging.info("old_product의 행 수가 new_product의 행 수와 같거나 적습니다. 업데이트를 중단합니다.")
-        return 'skip_update_tasks'
-
-
 # DAG 정의
 dag = DAG(
-    'process_brand_info_dag_v11_3',
+    'process_brand_info_dag_v11_4',
     default_args=default_args,
     description='S3에서 제품 브랜드 정보를 처리하는 DAG',
     schedule_interval='@daily',
@@ -154,17 +153,10 @@ clear_xcom_end = PythonOperator(
     dag=dag,
 )
 
-# Branching task 정의
+# Branching task 정의 - 수정된 함수 사용
 branching_task = BranchPythonOperator(
-    task_id='check_file_exists_task',
-    python_callable=check_file_exists,
-    dag=dag,
-)
-
-# 업데이트 여부 결정 태스크 정의
-update_decision_task = BranchPythonOperator(
-    task_id='update_decision_task',
-    python_callable=branch_update_decision,
+    task_id='check_file_and_decide_update_task',
+    python_callable=check_file_and_decide_update,
     dag=dag,
 )
 
@@ -237,8 +229,7 @@ combine_and_upload_task = PythonOperator(
 
 # Task dependencies 설정
 clear_xcom_start >> branching_task
-branching_task >> [update_decision_task, process_zigzag_task]
-update_decision_task >> [prepare_update_urls_task, skip_update_tasks]
+branching_task >> [prepare_update_urls_task, process_zigzag_task, skip_update_tasks]
 prepare_update_urls_task >> [update_musinsa_task, update_29cm_task, update_zigzag_task] >> combine_and_upload_updated_task
 process_zigzag_task >> process_musinsa_task >> process_29cm_task >> combine_and_upload_task
 [combine_and_upload_updated_task, combine_and_upload_task, skip_update_tasks] >> clear_xcom_end
