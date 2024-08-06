@@ -25,6 +25,11 @@ def create_gender_df(product_df, reviews_df):
     merged_df = merged_df[merged_df["platform"].notna()]
     merged_df = merged_df[merged_df["gender"].notna()]
     result_df = merged_df[["product_name", "gender"]].drop_duplicates()
+
+    # id 컬럼 추가
+    result_df.reset_index(drop=True, inplace=True)
+    result_df["id"] = result_df.index + 1
+
     return result_df
 
 
