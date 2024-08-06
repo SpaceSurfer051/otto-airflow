@@ -42,6 +42,7 @@ def upload_gender_table_to_redshift(df):
         """
         DROP TABLE IF EXISTS otto.gender_table CASCADE;
         CREATE TABLE IF NOT EXISTS otto.gender_table (
+            id INT PRIMARY KEY,
             product_name TEXT,
             gender TEXT
         );
@@ -51,10 +52,10 @@ def upload_gender_table_to_redshift(df):
     for _, row in df.iterrows():
         cursor.execute(
             """
-            INSERT INTO otto.gender_table (product_name, gender)
-            VALUES (%s, %s)
+            INSERT INTO otto.gender_table (id, product_name, gender)
+            VALUES (%s, %s, %s)
             """,
-            (row["product_name"], row["gender"]),
+            (row["id"], row["product_name"], row["gender"]),
         )
 
     connection.commit()
@@ -70,7 +71,7 @@ def upload_gender_table_to_rds():
     redshift_connection = redshift_hook.get_conn()
     redshift_cursor = redshift_connection.cursor()
 
-    redshift_cursor.execute("SELECT product_name, gender FROM otto.gender_table")
+    redshift_cursor.execute("SELECT id, product_name, gender FROM otto.gender_table")
     gender_data = redshift_cursor.fetchall()
 
     # RDS에 연결
@@ -82,6 +83,7 @@ def upload_gender_table_to_rds():
         """
         DROP TABLE IF EXISTS otto.gender_table CASCADE;
         CREATE TABLE IF NOT EXISTS otto.gender_table (
+            id INT PRIMARY KEY,
             product_name TEXT,
             gender TEXT
         );
@@ -90,16 +92,10 @@ def upload_gender_table_to_rds():
 
     # Redshift로부터 가져온 데이터를 RDS에 적재
     insert_query = (
-        "INSERT INTO otto.gender_table (product_name, gender) VALUES (%s, %s)"
+        "INSERT INTO otto.gender_table (id, product_name, gender) VALUES (%s, %s, %s)"
     )
     for row in gender_data:
         rds_cursor.execute(insert_query, row)
 
     # 변경사항 커밋
     rds_connection.commit()
-
-    # 커서와 연결 닫기
-    redshift_cursor.close()
-    redshift_connection.close()
-    rds_cursor.close()
-    rds_connection.close()

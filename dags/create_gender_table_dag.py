@@ -1,3 +1,5 @@
+# modified 2024-08-06 14:35 UTC+09
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
