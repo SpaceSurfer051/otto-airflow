@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.postgres_hook import PostgresHook
+from sqlalchemy import create_engine, text
 import pandas as pd
 import re
 import random
@@ -14,18 +15,30 @@ default_args = {
 }
 
 dag = DAG(
-    "29cm_data_preprocessing",
+    "otto_redshift_data_processing",
     default_args=default_args,
-    description="Redshift 데이터 전처리 후 결과를 다시 Redshift에 저장하는 DAG",
+    description="Redshift 데이터 처리 후 결과를 다시 Redshift에 저장하는 DAG",
     schedule_interval=None,
 )
 
 
 def fetch_data_from_redshift(**kwargs):
-    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
+    redshift_hook = PostgresHook(postgres_conn_id="redshift")
     conn = redshift_hook.get_conn()
-    sql_product = "SELECT product_name, size, category, platform, brand FROM otto.product_table WHERE platform = '29cm';"
-    sql_reviews = "SELECT product_name, size, height, weight, gender, size_comment FROM otto.reviews WHERE product_name IN (SELECT product_name FROM otto.product_table WHERE platform = '29cm');"
+    sql_product = """
+        SELECT product_name, size, category, platform, brand
+        FROM otto.product_table
+        WHERE platform = '29cm';
+    """
+    sql_reviews = """
+        SELECT product_name, size, height, weight, gender, size_comment
+        FROM otto.reviews
+        WHERE product_name IN (
+            SELECT product_name
+            FROM otto.product_table
+            WHERE platform = '29cm'
+        );
+    """
 
     product_df = pd.read_sql(sql_product, conn)
     reviews_df = pd.read_sql(sql_reviews, conn)
@@ -224,9 +237,9 @@ def process_data(**kwargs):
 
 
 def save_data_to_redshift(**kwargs):
-    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
+    redshift_hook = PostgresHook(postgres_conn_id="redshift")
     conn = redshift_hook.get_conn()
-    cursor = conn.cursor()
+    engine = create_engine("postgresql+psycopg2://username:password@host:port/dbname")
 
     ti = kwargs["ti"]
     processed_product_df_json = ti.xcom_pull(key="processed_product_df")
@@ -235,17 +248,46 @@ def save_data_to_redshift(**kwargs):
     processed_product_df = pd.read_json(processed_product_df_json)
     processed_reviews_df = pd.read_json(processed_reviews_df_json)
 
-    # Use schema and table names as specified
-    processed_product_df.to_sql(
-        "29cm_product", con=conn, schema="otto", if_exists="replace", index=False
-    )
-    processed_reviews_df.to_sql(
-        "29cm_reviews", con=conn, schema="otto", if_exists="replace", index=False
-    )
+    # Ensure tables exist and use schema and table names as specified
+    with engine.connect() as connection:
+        connection.execute(
+            text(
+                """
+            DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
+            CREATE TABLE IF NOT EXISTS otto."29cm_product" (
+                product_name TEXT,
+                size TEXT,
+                category TEXT,
+                platform TEXT,
+                brand TEXT
+            );
+        """
+            )
+        )
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        connection.execute(
+            text(
+                """
+            DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
+            CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
+                product_name TEXT,
+                size TEXT,
+                height NUMERIC,
+                weight NUMERIC,
+                gender TEXT,
+                size_comment TEXT
+            );
+        """
+            )
+        )
+
+        # Insert data into tables
+        processed_product_df.to_sql(
+            "29cm_product", con=engine, schema="otto", if_exists="append", index=False
+        )
+        processed_reviews_df.to_sql(
+            "29cm_reviews", con=engine, schema="otto", if_exists="append", index=False
+        )
 
 
 fetch_task = PythonOperator(
