@@ -224,7 +224,7 @@ def process_data(**kwargs):
 
 
 def save_data_to_redshift(**kwargs):
-    redshift_hook = PostgresHook(postgres_conn_id="redshift")
+    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     conn = redshift_hook.get_conn()
     cursor = conn.cursor()
 
