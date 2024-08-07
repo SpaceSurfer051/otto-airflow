@@ -14,15 +14,15 @@ default_args = {
 }
 
 dag = DAG(
-    "otto_redshift_data_processing",
+    "29cm_data_preprocessing",
     default_args=default_args,
-    description="Redshift 데이터 처리 후 결과를 다시 Redshift에 저장하는 DAG",
+    description="Redshift 데이터 전처리 후 결과를 다시 Redshift에 저장하는 DAG",
     schedule_interval=None,
 )
 
 
 def fetch_data_from_redshift(**kwargs):
-    redshift_hook = PostgresHook(postgres_conn_id="redshift")
+    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     conn = redshift_hook.get_conn()
     sql_product = "SELECT product_name, size, category, platform, brand FROM otto.product_table WHERE platform = '29cm';"
     sql_reviews = "SELECT product_name, size, height, weight, gender, size_comment FROM otto.reviews WHERE product_name IN (SELECT product_name FROM otto.product_table WHERE platform = '29cm');"
