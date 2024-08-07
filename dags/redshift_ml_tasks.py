@@ -43,7 +43,7 @@ def process_data(products_df, reviews_df):
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
                 logging.info("잘 맞아요")
-                return size_list[index - 1] if index > 0 else size_list[index]
+                return size_list[index]
         except ValueError:
             return row["size"]
 
