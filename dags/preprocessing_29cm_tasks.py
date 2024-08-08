@@ -1,25 +1,10 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-from airflow.utils.dates import days_ago
+# 29cm_preprocessing_task.py
+
 from airflow.hooks.postgres_hook import PostgresHook
-from sqlalchemy import create_engine, text
 import pandas as pd
 import re
 import random
 import json
-
-default_args = {
-    "owner": "suyeon",
-    "start_date": days_ago(1),
-    "retries": 1,
-}
-
-dag = DAG(
-    "29cm_data_processing",
-    default_args=default_args,
-    description="Redshift 데이터 처리 후 결과를 다시 Redshift에 저장하는 DAG",
-    schedule_interval=None,
-)
 
 
 def fetch_data_from_redshift(**kwargs):
@@ -74,9 +59,7 @@ def process_data(**kwargs):
                     start_size = found_sizes[0]
                     end_size = found_sizes[-1]
                     if start_size in size_list_upper and end_size in size_list_upper:
-                        start_index = size_list_upper.index(start_size)
-                        end_index = size_list_upper.index(end_size)
-                        return size_list_upper[start_index : end_index + 1]
+                        return size_list_upper[start_size : end_size + 1]
             if "," in size_str:
                 size_str = size_str.split(",")
             elif "/" in size_str:
@@ -318,29 +301,29 @@ def save_data_to_redshift(**kwargs):
     # Ensure tables exist and use schema and table names as specified
     cursor.execute(
         """
-    DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
-    CREATE TABLE IF NOT EXISTS otto."29cm_product" (
-        product_name TEXT,
-        size TEXT,
-        category TEXT,
-        platform TEXT,
-        brand TEXT
-    );
-    """
+        DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
+        CREATE TABLE IF NOT EXISTS otto."29cm_product" (
+            product_name TEXT,
+            size TEXT,
+            category TEXT,
+            platform TEXT,
+            brand TEXT
+        );
+        """
     )
 
     cursor.execute(
         """
-    DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
-    CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
-        product_name TEXT,
-        size TEXT,
-        height NUMERIC,
-        weight NUMERIC,
-        gender TEXT,
-        size_comment TEXT
-    );
-    """
+        DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
+        CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
+            product_name TEXT,
+            size TEXT,
+            height NUMERIC,
+            weight NUMERIC,
+            gender TEXT,
+            size_comment TEXT
+        );
+        """
     )
 
     # Insert data into 29cm_product table
@@ -379,27 +362,3 @@ def save_data_to_redshift(**kwargs):
     conn.commit()
     cursor.close()
     conn.close()
-
-
-fetch_task = PythonOperator(
-    task_id="fetch_data",
-    python_callable=fetch_data_from_redshift,
-    provide_context=True,
-    dag=dag,
-)
-
-process_task = PythonOperator(
-    task_id="process_data",
-    python_callable=process_data,
-    provide_context=True,
-    dag=dag,
-)
-
-save_task = PythonOperator(
-    task_id="save_data",
-    python_callable=save_data_to_redshift,
-    provide_context=True,
-    dag=dag,
-)
-
-fetch_task >> process_task >> save_task
