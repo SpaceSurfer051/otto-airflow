@@ -298,7 +298,6 @@ def save_data_to_redshift(**kwargs):
             """,
             (
                 row["product_name"],
-                row["size"],
                 ",".join(row["size"]) if isinstance(row["size"], list) else row["size"],
                 row["category"],
                 row["platform"],
@@ -311,7 +310,7 @@ def save_data_to_redshift(**kwargs):
         cursor.execute(
             """
             INSERT INTO otto."29cm_reviews" (product_name, size, height, weight, gender, size_comment)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 row["product_name"],
