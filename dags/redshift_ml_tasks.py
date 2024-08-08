@@ -5,15 +5,14 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 def fetch_data_from_redshift():
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
-    products_query = "SELECT * FROM otto.product_table"
-    reviews_query = "SELECT * FROM otto.reviews"
+    products_query = """ SELECT * FROM otto."29cm_product" """
+    reviews_query = """ SELECT * FROM otto."29cm_reviews" """
 
     connection = redshift_hook.get_conn()
     products_df = pd.read_sql(products_query, connection)
     reviews_df = pd.read_sql(reviews_query, connection)
 
     connection.close()
-
     return products_df, reviews_df
 
 
@@ -31,18 +30,18 @@ def process_data(products_df, reviews_df):
     def recommend_size(row, size_list):
         try:
             index = size_list.index(row["size"])
-            if row["size_comment"] == "작아요":
-                logging.info("작아요")
+            if row["size_comment"] == -1:
+                logging.info("small")
                 return (
                     size_list[index + 1]
                     if index + 1 < len(size_list)
                     else size_list[index]
                 )
-            elif row["size_comment"] == "커요":
-                logging.info("커요")
+            elif row["size_comment"] == 1:
+                logging.info("big")
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
-                logging.info("잘 맞아요")
+                logging.info("fit")
                 return size_list[index]
         except ValueError:
             return row["size"]

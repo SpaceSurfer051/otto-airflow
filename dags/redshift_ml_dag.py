@@ -9,7 +9,7 @@ from redshift_ml_tasks import (
 )
 
 default_args = {
-    "owner": "airflow",
+    "owner": "suyeon",
     "start_date": days_ago(1),
     "retries": 1,
 }
