@@ -45,7 +45,6 @@ def process_data(products_df, reviews_df):
                 logging.info("fit")
                 return size_list[index]
         except ValueError:
-            logging.info("else")
             return row["size"]
 
     # Generating size recommendations
