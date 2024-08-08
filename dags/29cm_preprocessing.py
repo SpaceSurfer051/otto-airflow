@@ -314,7 +314,7 @@ def save_data_to_redshift(**kwargs):
             """,
             (
                 row["product_name"],
-                row["size"],
+                ",".join(row["size"]) if isinstance(row["size"], list) else row["size"],
                 row["height"],
                 row["weight"],
                 row["gender"],
