@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import ast
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -54,10 +55,7 @@ def process_data(products_df, reviews_df):
             products_df["product_name"] == review["product_name"], "size"
         ]
         if not product_sizes.empty:
-            logging.info("1 : {}".format(product_sizes))
-            size_list = product_sizes.values[0].strip("[]").split(",")
-            logging.info("2 : {}".format(size_list))
-            size_list = [s.strip() for s in size_list]
+            size_list = ast.literal_eval(product_sizes)
             logging.info("3 : {}".format(size_list))
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
