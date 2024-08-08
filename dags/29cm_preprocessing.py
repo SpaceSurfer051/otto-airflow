@@ -217,11 +217,24 @@ def process_data(**kwargs):
 
     product_df["size"] = product_df["size"].apply(clean_size_column)
     reviews_df["size"] = reviews_df["size"].apply(select_last_smlf)
-    reviews_df["height"] = reviews_df.apply(
-        lambda row: generate_random_value(row["size"], row["gender"], "height"), axis=1
+    # Update height if it is "none"
+    reviews_df.loc[reviews_df["height"] == "none", "height"] = reviews_df.apply(
+        lambda row: (
+            generate_random_value(row["size"], row["gender"], "height")
+            if row["height"] == "none"
+            else row["height"]
+        ),
+        axis=1,
     )
-    reviews_df["weight"] = reviews_df.apply(
-        lambda row: generate_random_value(row["size"], row["gender"], "weight"), axis=1
+
+    # Update weight if it is "none"
+    reviews_df.loc[reviews_df["weight"] == "none", "weight"] = reviews_df.apply(
+        lambda row: (
+            generate_random_value(row["size"], row["gender"], "weight")
+            if row["weight"] == "none"
+            else row["weight"]
+        ),
+        axis=1,
     )
 
     processed_product_df = product_df[
@@ -280,7 +293,7 @@ def save_data_to_redshift(**kwargs):
     for _, row in processed_product_df.iterrows():
         cursor.execute(
             """
-            INSERT INTO otto.29cm_product (product_name, size, category, platform, brand)
+            INSERT INTO otto."29cm_product" (product_name, size, category, platform, brand)
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
@@ -296,7 +309,7 @@ def save_data_to_redshift(**kwargs):
     for _, row in processed_reviews_df.iterrows():
         cursor.execute(
             """
-            INSERT INTO otto.29cm_reviews (product_name, size, height, weight, gender, size_comment)
+            INSERT INTO otto."29cm_reviews" (product_name, size, height, weight, gender, size_comment)
             VALUES (%s, %s, %s, %s, %s)
             """,
             (
