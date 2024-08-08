@@ -59,7 +59,9 @@ def process_data(**kwargs):
                     start_size = found_sizes[0]
                     end_size = found_sizes[-1]
                     if start_size in size_list_upper and end_size in size_list_upper:
-                        return size_list_upper[start_size : end_size + 1]
+                        start_index = size_list_upper.index(start_size)
+                        end_index = size_list_upper.index(end_size)
+                        return size_list_upper[start_index : end_index + 1]
             if "," in size_str:
                 size_str = size_str.split(",")
             elif "/" in size_str:
