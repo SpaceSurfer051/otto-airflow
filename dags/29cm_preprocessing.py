@@ -218,6 +218,9 @@ def process_data(**kwargs):
     # Processing product and review data
     product_df["size"] = product_df["size"].apply(clean_size_column)
     reviews_df["size"] = reviews_df["size"].apply(select_last_smlf)
+    reviews_df["size_comment"] = reviews_df["size_comment"].apply(
+        lambda x: -1 if "작아요" in x else (1 if "커요" in x else 0)
+    )
 
     # Convert size column to lists where needed
     product_df["size"] = product_df["size"].apply(
