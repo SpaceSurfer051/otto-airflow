@@ -15,7 +15,7 @@ default_args = {
 }
 
 dag = DAG(
-    "otto_redshift_data_processing",
+    "29cm_data_processing",
     default_args=default_args,
     description="Redshift 데이터 처리 후 결과를 다시 Redshift에 저장하는 DAG",
     schedule_interval=None,
@@ -239,7 +239,7 @@ def process_data(**kwargs):
 def save_data_to_redshift(**kwargs):
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     conn = redshift_hook.get_conn()
-    engine = create_engine("postgresql+psycopg2://username:password@host:port/dbname")
+    cursor = conn.cursor()
 
     ti = kwargs["ti"]
     processed_product_df_json = ti.xcom_pull(key="processed_product_df")
@@ -249,45 +249,69 @@ def save_data_to_redshift(**kwargs):
     processed_reviews_df = pd.read_json(processed_reviews_df_json)
 
     # Ensure tables exist and use schema and table names as specified
-    with engine.connect() as connection:
-        connection.execute(
-            text(
-                """
-            DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
-            CREATE TABLE IF NOT EXISTS otto."29cm_product" (
-                product_name TEXT,
-                size TEXT,
-                category TEXT,
-                platform TEXT,
-                brand TEXT
-            );
+    cursor.execute(
         """
-            )
+    DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
+    CREATE TABLE IF NOT EXISTS otto."29cm_product" (
+        product_name TEXT,
+        size TEXT,
+        category TEXT,
+        platform TEXT,
+        brand TEXT
+    );
+    """
+    )
+
+    cursor.execute(
+        """
+    DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
+    CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
+        product_name TEXT,
+        size TEXT,
+        height NUMERIC,
+        weight NUMERIC,
+        gender TEXT,
+        size_comment TEXT
+    );
+    """
+    )
+
+    # Insert data into 29cm_product table
+    for _, row in processed_product_df.iterrows():
+        cursor.execute(
+            """
+            INSERT INTO otto.29cm_product (product_name, size, category, platform, brand)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                row["product_name"],
+                row["size"],
+                row["category"],
+                row["platform"],
+                row["brand"],
+            ),
         )
 
-        connection.execute(
-            text(
-                """
-            DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
-            CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
-                product_name TEXT,
-                size TEXT,
-                height NUMERIC,
-                weight NUMERIC,
-                gender TEXT,
-                size_comment TEXT
-            );
-        """
-            )
+    # Insert data into 29cm_reviews table
+    for _, row in processed_reviews_df.iterrows():
+        cursor.execute(
+            """
+            INSERT INTO otto.29cm_reviews (product_name, size, height, weight, gender, size_comment)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                row["product_name"],
+                row["size"],
+                row["height"],
+                row["weight"],
+                row["gender"],
+                row["size_comment"],
+            ),
         )
 
-        # Insert data into tables
-        processed_product_df.to_sql(
-            "29cm_product", con=engine, schema="otto", if_exists="append", index=False
-        )
-        processed_reviews_df.to_sql(
-            "29cm_reviews", con=engine, schema="otto", if_exists="append", index=False
-        )
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 fetch_task = PythonOperator(
