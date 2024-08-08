@@ -267,7 +267,7 @@ def save_data_to_redshift(**kwargs):
     DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
     CREATE TABLE IF NOT EXISTS otto."29cm_product" (
         product_name TEXT,
-        size array,
+        size TEXT,
         category TEXT,
         platform TEXT,
         brand TEXT
@@ -298,6 +298,7 @@ def save_data_to_redshift(**kwargs):
             """,
             (
                 row["product_name"],
+                row["size"],
                 ",".join(row["size"]) if isinstance(row["size"], list) else row["size"],
                 row["category"],
                 row["platform"],
