@@ -9,7 +9,7 @@ import random
 import json
 
 default_args = {
-    "owner": "airflow",
+    "owner": "suyeon",
     "start_date": days_ago(1),
     "retries": 1,
 }
@@ -215,8 +215,66 @@ def process_data(**kwargs):
             min_val, max_val = size_ranges["F"][gender][attribute]
         return round(random.uniform(min_val, max_val))
 
+    # Processing product and review data
     product_df["size"] = product_df["size"].apply(clean_size_column)
     reviews_df["size"] = reviews_df["size"].apply(select_last_smlf)
+
+    # Convert size column to lists where needed
+    product_df["size"] = product_df["size"].apply(
+        lambda x: convert_size_string_to_list(x) if isinstance(x, str) else []
+    )
+
+    # Fill empty sizes in the review data based on product sizes
+    for index, product_row in product_df.iterrows():
+        product_name = product_row["product_name"]
+        product_size_list = product_row["size"]
+
+        if not product_size_list:
+            product_size_list = []
+
+        review_rows = reviews_df[reviews_df["product_name"] == product_name]
+
+        for review_index, review_row in review_rows.iterrows():
+            review_size = review_row["size"]
+
+            if product_size_list:
+                if review_size not in product_size_list:
+                    reviews_df.at[review_index, "size"] = "none"
+            else:
+                if pd.notna(review_size) and review_size != "none":
+                    product_size_list.append(review_size)
+
+        product_df.at[index, "size"] = (
+            str(product_size_list) if product_size_list else None
+        )
+
+    # Fill empty sizes with sizes from similar branded products
+    for index, product_row in product_df.iterrows():
+        if not product_row["size"]:
+            brand = product_row["brand"]
+            similar_branded_products = product_df[
+                (product_df["brand"] == brand) & (product_df["size"].notna())
+            ]
+            if not similar_branded_products.empty:
+                non_empty_size_str = similar_branded_products.iloc[0]["size"]
+                product_df.at[index, "size"] = non_empty_size_str
+            else:
+                product_df.at[index, "size"] = str(["S", "M", "L", "XL"])
+
+    # Replace "none" sizes with actual sizes
+    for index, review_row in reviews_df[reviews_df["size"] == "none"].iterrows():
+        product_name = review_row["product_name"]
+        similar_product = product_df[product_df["product_name"] == product_name]
+        if not similar_product.empty:
+            size_str = similar_product.iloc[0]["size"]
+            size_list = convert_size_string_to_list(size_str)
+            if size_list:
+                random_size = random.choice(size_list)
+                reviews_df.at[index, "size"] = random_size
+            else:
+                random_size = random.choice(["S", "M", "L", "XL"])
+                reviews_df.at[index, "size"] = random_size
+
     # Update height if it is "none"
     reviews_df.loc[reviews_df["height"] == "none", "height"] = reviews_df.apply(
         lambda row: (
@@ -237,16 +295,9 @@ def process_data(**kwargs):
         axis=1,
     )
 
-    processed_product_df = product_df[
-        ["product_name", "size", "category", "platform", "brand"]
-    ]
-    processed_reviews_df = reviews_df[
-        ["product_name", "size", "height", "weight", "gender", "size_comment"]
-    ]
-
-    ti = kwargs["ti"]
-    ti.xcom_push(key="processed_product_df", value=processed_product_df.to_json())
-    ti.xcom_push(key="processed_reviews_df", value=processed_reviews_df.to_json())
+    # Push processed data back to XCom
+    ti.xcom_push(key="processed_product_df", value=product_df.to_json())
+    ti.xcom_push(key="processed_reviews_df", value=reviews_df.to_json())
 
 
 def save_data_to_redshift(**kwargs):
