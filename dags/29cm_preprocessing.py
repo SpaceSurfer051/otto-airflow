@@ -213,7 +213,7 @@ def process_data(**kwargs):
             min_val, max_val = size_ranges[size][gender][attribute]
         else:
             min_val, max_val = size_ranges["F"][gender][attribute]
-        return round(random.uniform(min_val, max_val), 2)
+        return round(random.uniform(min_val, max_val))
 
     product_df["size"] = product_df["size"].apply(clean_size_column)
     reviews_df["size"] = reviews_df["size"].apply(select_last_smlf)
@@ -267,7 +267,7 @@ def save_data_to_redshift(**kwargs):
     DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
     CREATE TABLE IF NOT EXISTS otto."29cm_product" (
         product_name TEXT,
-        size TEXT,
+        size array,
         category TEXT,
         platform TEXT,
         brand TEXT
