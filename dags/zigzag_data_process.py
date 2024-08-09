@@ -356,15 +356,6 @@ def separate_size_color(value):
     if value in colors:
         return np.nan
     return value
-
-def replace_numbers_with_nan(value):
-    try:
-        # 값을 float으로 변환 시도
-        float_value = float(value)
-        return np.nan
-    except ValueError:
-        # 변환에 실패하면 (즉, 숫자가 아니면) 원래 값을 반환
-        return value
     
 def f_to_null(text):
     if pd.isna(text):
