@@ -134,6 +134,17 @@ def process(**kwargs):
     r_df['height'] = pd.to_numeric(r_df['height'], errors='coerce')
     r_df['weight'] = pd.to_numeric(r_df['weight'], errors='coerce')
     
+    processed_product_df = p_df[
+        ["product_name", "size", "category", "platform", "brand"]
+    ]
+    processed_reviews_df = r_df[
+        ["product_name", "size", "height", "weight", "gender", "size_comment"]
+    ]
+
+    ti = kwargs["ti"]
+    ti.xcom_push(key="processed_product_df", value=processed_product_df.to_json())
+    ti.xcom_push(key="processed_reviews_df", value=processed_reviews_df.to_json())
+    
 def save_data_to_redshift(**kwargs):
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     conn = redshift_hook.get_conn()
