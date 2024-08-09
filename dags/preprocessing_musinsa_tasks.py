@@ -149,7 +149,7 @@ def process_data(**kwargs):
         gender = row['gender']
         size_comment = row['size_comment']
         
-        valid_sizes_2 = extract_valid_sizes(product_size)
+        valid_sizes_2 = product_size
         size_index = valid_sizes_2.index(review_size) if review_size in valid_sizes_2 else -1
         
         if gender == '남성':
@@ -185,7 +185,7 @@ def process_data(**kwargs):
         product_size = row['product_size']
         review_size = row['review_size']
         
-        valid_sizes_2 = extract_valid_sizes(product_size)
+        valid_sizes_2 = product_size
         
         if review_size.lower() in valid_sizes_2:
             index = valid_sizes_2.index(review_size.lower())
