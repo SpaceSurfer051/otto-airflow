@@ -35,14 +35,14 @@ def process_data(products_df, reviews_df):
             logging.info("index : {}".format(index))
             logging.info("size : {}".format(size_list[index]))
             logging.info("size_comment : {}".format(row["size_comment"]))
-            if row["size_comment"] == -1:
+            if row["size_comment"] == "-1":
                 logging.info("small")
                 return (
                     size_list[index + 1]
                     if index + 1 < len(size_list)
                     else size_list[index]
                 )
-            elif row["size_comment"] == 1:
+            elif row["size_comment"] == "1":
                 logging.info("big")
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
@@ -59,8 +59,7 @@ def process_data(products_df, reviews_df):
             products_df["product_name"] == review["product_name"], "size"
         ]
         if not product_sizes.empty:
-            size_list = product_sizes.values[0].strip("[]").split(",")
-            size_list = [s.strip().strip("'") for s in size_list]
+            size_list = ast.literal_eval(product_sizes.values[0])
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:
