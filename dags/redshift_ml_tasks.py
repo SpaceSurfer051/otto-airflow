@@ -60,8 +60,8 @@ def process_data(products_df, reviews_df):
             products_df["product_name"] == review["product_name"], "size"
         ]
         if not product_sizes.empty:
-            # size_list = ast.literal_eval(product_sizes.values[0])
-            size_list = json.loads(product_sizes)
+            size_list = ast.literal_eval(product_sizes.values[0])
+            size_list = eval(product_sizes)
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:
