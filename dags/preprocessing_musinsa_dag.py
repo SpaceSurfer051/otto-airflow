@@ -1,9 +1,9 @@
-# 29cm_preprocessing_dag.py
+# musinsa_preprocessing_dag.py
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from preprocessing_29cm_tasks import (
+from preprocessing_musinsa_tasks import (
     fetch_data_from_redshift,
     process_data,
     save_data_to_redshift,

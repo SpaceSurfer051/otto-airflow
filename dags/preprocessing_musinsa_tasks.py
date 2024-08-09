@@ -1,4 +1,4 @@
-# 29cm_preprocessing_task.py
+# musinsa_preprocessing_task.py
 
 from airflow.hooks.postgres_hook import PostgresHook
 import pandas as pd
