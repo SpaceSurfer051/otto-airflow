@@ -32,7 +32,7 @@ def process_data(products_df, reviews_df):
     def recommend_size(row, size_list):
         try:
             index = size_list.index(row["size"])
-            logging.info("\nsize_list : {}".format(size_list))
+            logging.info("size_list : {}".format(size_list))
             logging.info("index : {}".format(index))
             logging.info("size : {}".format(size_list[index]))
             logging.info("size_comment : {}".format(row["size_comment"]))
@@ -62,7 +62,7 @@ def process_data(products_df, reviews_df):
         if not product_sizes.empty:
             size_list = ast.literal_eval(product_sizes.values[0])
             if not isinstance(size_list, str):
-                logging.info(type(size_list))
+                logging.info("\n{}".format(type(size_list)))
             # size_list = eval(product_sizes)
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
