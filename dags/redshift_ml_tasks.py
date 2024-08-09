@@ -31,7 +31,10 @@ def process_data(products_df, reviews_df):
     def recommend_size(row, size_list):
         try:
             index = size_list.index(row["size"])
-            logging.info(index)
+            logging.info("\nsize_list : {}".format(size_list))
+            logging.info("index : {}".format(index))
+            logging.info("size : {}".format(size_list[index]))
+            logging.info("size_comment : {}".format(row["size_comment"]))
             if row["size_comment"] == -1:
                 logging.info("small")
                 return (
