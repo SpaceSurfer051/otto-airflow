@@ -157,7 +157,10 @@ def save_data_to_redshift(**kwargs):
     processed_product_df = pd.read_json(processed_product_df_json)
     processed_reviews_df = pd.read_json(processed_reviews_df_json)
 
-    # Ensure tables exist and use schema and table names as specified
+    # NaN 값을 None으로 변환
+    processed_product_df = processed_product_df.where(pd.notnull(processed_product_df), None)
+    processed_reviews_df = processed_reviews_df.where(pd.notnull(processed_reviews_df), None)
+
     cursor.execute(
         """
     DROP TABLE IF EXISTS otto."zigzag_product" CASCADE;
@@ -185,7 +188,7 @@ def save_data_to_redshift(**kwargs):
     """
     )
 
-    # Insert data into 29cm_product table
+    # Insert data into zigzag_product table
     for _, row in processed_product_df.iterrows():
         cursor.execute(
             """
@@ -201,7 +204,7 @@ def save_data_to_redshift(**kwargs):
             ),
         )
 
-    # Insert data into 29cm_reviews table
+    # Insert data into zigzag_reviews table
     for _, row in processed_reviews_df.iterrows():
         cursor.execute(
             """
