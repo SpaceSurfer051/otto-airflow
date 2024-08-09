@@ -39,16 +39,6 @@ def fetch_data_from_redshift(**kwargs):
 
 
 def process_data(**kwargs):
-    ti = kwargs["ti"]
-    product_df_json = ti.xcom_pull(key="product_df")
-    reviews_df_json = ti.xcom_pull(key="reviews_df")
-
-    product_df = pd.read_json(product_df_json)
-    reviews_df = pd.read_json(reviews_df_json)
-
-    valid_sizes = ['WS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', 'F', 'Free']
-    default_sizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
-
     # product_size를 리스트로 변환하고 조건에 맞게 처리하는 함수
     def preprocess_product_size(product_size):
         try:
@@ -191,11 +181,77 @@ def process_data(**kwargs):
             return '남성' if 'm' in valid_sizes_2 or 'l' in valid_sizes_2 else '여성'
         
         
-    
+    ti = kwargs["ti"]
+    product_df_json = ti.xcom_pull(key="product_df")
+    reviews_df_json = ti.xcom_pull(key="reviews_df")
+
+    product_df = pd.read_json(product_df_json)
+    reviews_df = pd.read_json(reviews_df_json)
+
+    valid_sizes = ['WS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', 'F', 'Free']
+    default_sizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
+
+# culonculon 
+
+    # df1_filtered의 size 컬럼 이름 변경
+    df1_filtered = product_df.rename(columns={'size': 'product_size'})
+
+    # df2_filtered의 size 컬럼 이름 변경
+    df2_filtered = reviews_df.rename(columns={'size': 'review_size'})
+
+    # product_size 컬럼에서 한글과 괄호로 둘러싸인 텍스트를 모두 제거
+    df1_filtered['product_size'] = df1_filtered['product_size'].apply(clean_size)
+
+    df2_filtered.loc[df2_filtered['review_size'].apply(len) >= 3, 'review_size'] = df2_filtered.loc[df2_filtered['review_size'].apply(len) >= 3, 'review_size'].apply(clean_review_size)
+
+    # 두 데이터 프레임을 product_name을 기준으로 조인
+    merged_df = pd.merge(df1_filtered, df2_filtered, on='product_name', suffixes=('_product', '_review'))
+
+    # product_size 전처리
+    merged_df['product_size'] = merged_df['product_size'].apply(preprocess_product_size)
+
+    # review_size를 전처리
+    merged_df['review_size'] = merged_df.apply(clean_review_size_2, axis=1)
+
+    # size_comment 전처리
+    merged_df['size_comment'] = merged_df['size_comment'].apply(clean_size_comment)
+
+    # height와 weight를 전처리
+    for index, row in merged_df.iterrows():
+        if pd.isna(row['height']) or row['height'] == 'none':
+            height, weight = calculate_height_weight(row)
+            merged_df.at[index, 'height'] = height
+            merged_df.at[index, 'weight'] = weight
+            
+    # gender 전처리
+    merged_df['gender'] = merged_df.apply(lambda row: infer_gender(row) if pd.isna(row['gender']) else row['gender'], axis=1)
+
+    # height와 weight를 정수로 변환
+    merged_df['height'] = (merged_df['height'].astype(float)).astype(int)
+    merged_df['weight'] = (merged_df['weight'].astype(float)).astype(int)
+
+    # df1_filtered (product_table)에 해당하는 데이터프레임 분리
+    df1_final = merged_df[['product_name', 'product_size', 'category', 'platform', 'brand']]
+    df1_final.columns = ['product_name', 'size', 'category', 'platform', 'brand']
+
+    # 1. list 타입의 데이터를 문자열로 변환
+    df1_final['size'] = df1_final['size'].apply(lambda x: str(x) if isinstance(x, list) else x)
+
+    # 2. 중복된 행 제거
+    df1_final.drop_duplicates(inplace=True)
+
+    # 3. 문자열로 변환된 데이터를 다시 list로 변환
+    df1_final['size'] = df1_final['size'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
+
+    # df2_filtered (reviews_table)에 해당하는 데이터프레임 분리
+    df2_final = merged_df[['product_name', 'review_size', 'height', 'weight', 'gender', 'size_comment']]
+    df2_final.columns = ['product_name', 'size', 'height', 'weight', 'gender', 'size_comment']
+
+# culonculon
 
     # Push processed data back to XCom
-    ti.xcom_push(key="processed_product_df", value=product_df.to_json())
-    ti.xcom_push(key="processed_reviews_df", value=reviews_df.to_json())
+    ti.xcom_push(key="processed_product_df", value=df1_final.to_json())
+    ti.xcom_push(key="processed_reviews_df", value=df2_final.to_json())
 
 
 def save_data_to_redshift(**kwargs):
