@@ -11,7 +11,7 @@ import pandas as pd
 import re
 import numpy as np
 import random
-
+import logging
 
 
 default_args = {
@@ -133,7 +133,11 @@ def process(**kwargs):
     r_df['size_comment'] = r_df['size_comment'].apply(size_change)
     r_df['height'] = pd.to_numeric(r_df['height'], errors='coerce')
     r_df['weight'] = pd.to_numeric(r_df['weight'], errors='coerce')
+    r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x)) if not isinstance(x, int) else x,axis=1 ) 
+    r_df["height"] = r_df.apply(lambda x : logging.info("weight : {}".format(x)) if not isinstance(x, int) else x,axis=1 ) 
     
+    logging.info(r_df['height'])
+    r_df['weight']
     processed_product_df = p_df[
         ["product_name", "size", "category", "platform", "brand"]
     ]
@@ -174,6 +178,7 @@ def save_data_to_redshift(**kwargs):
     );
     """
     )
+    print('zigzag_product is done')
 
     cursor.execute(
         """
