@@ -133,9 +133,12 @@ def process(**kwargs):
         )
     
     
-    r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
-    r_df["eight"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
-    
+    #r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["eight"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    null_values_height = r_df[r_df['height'].isnull()]
+    null_values_weight = r_df[r_df['weight'].isnull()]
+    logging.info("Null values in height column:\n{}".format(null_values_height))
+    logging.info("Null values in weight column:\n{}".format(null_values_weight))
     
     r_df['weight'] = r_df['weight'].replace(to_replace=r'kg', value='', regex=True)
     r_df['height'] = r_df['height'].replace(to_replace=r'cm', value='', regex=True)
@@ -143,11 +146,14 @@ def process(**kwargs):
     r_df['size_comment'] = r_df['size_comment'].apply(size_change)
     r_df['height'] = pd.to_numeric(r_df['height'], errors='coerce')
     r_df['weight'] = pd.to_numeric(r_df['weight'], errors='coerce')
-    r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
-    r_df["height"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["height"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    null_values_height = r_df[r_df['height'].isnull()]
+    null_values_weight = r_df[r_df['weight'].isnull()]
+    logging.info("re values in height column:\n{}".format(null_values_height))
+    logging.info("re values in weight column:\n{}".format(null_values_weight))
     
-    logging.info(r_df['height'])
-    r_df['weight']
+    
     processed_product_df = p_df[
         ["product_name", "size", "category", "platform", "brand"]
     ]
