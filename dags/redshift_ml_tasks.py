@@ -56,8 +56,8 @@ def process_data(products_df, reviews_df):
             products_df["product_name"] == review["product_name"], "size"
         ]
         if not product_sizes.empty:
-            size_list = list(product_sizes)
-            # size_list = ast.literal_eval(product_sizes.iloc[0])
+            size_list = product_sizes.values[0].strip("[]").split(",")
+            size_list = [s.strip().strip("'") for s in size_list]
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:
