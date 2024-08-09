@@ -61,7 +61,8 @@ def process_data(products_df, reviews_df):
         ]
         if not product_sizes.empty:
             size_list = ast.literal_eval(product_sizes.values[0])
-            logging.info(type(size_list))
+            if not isinstance(size_list, str):
+                logging.info(type(size_list))
             # size_list = eval(product_sizes)
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
