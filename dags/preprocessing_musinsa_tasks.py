@@ -39,6 +39,7 @@ def fetch_data_from_redshift(**kwargs):
 
 
 def process_data(**kwargs):
+    
     # product_size를 리스트로 변환하고 조건에 맞게 처리하는 함수
     def preprocess_product_size(product_size):
         try:
@@ -65,6 +66,21 @@ def process_data(**kwargs):
     # 괄호로 시작해서 괄호로 끝나는 텍스트를 제거하는 함수
     def remove_parentheses(text):
         return re.sub(r'\([^)]*\)', '', text)
+
+    # 빈 문자열을 제거하는 함수
+    def remove_empty_strings(size_list_str):
+        try:
+            # 문자열을 리스트로 변환
+            size_list = ast.literal_eval(size_list_str)
+            
+            # 빈 문자열을 제거
+            filtered_list = [size for size in size_list if size.strip() != '']
+            
+            # 리스트를 다시 문자열로 변환
+            return str(filtered_list)
+        except:
+            # 변환 중 오류가 발생하면 원래 문자열을 반환
+            return size_list_str
 
     def clean_review_size(review_size):
         # 소문자로 변환
@@ -188,10 +204,10 @@ def process_data(**kwargs):
     product_df = pd.read_json(product_df_json)
     reviews_df = pd.read_json(reviews_df_json)
 
+# culonculon 
+
     valid_sizes = ['WS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', 'F', 'Free']
     default_sizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
-
-# culonculon 
 
     # df1_filtered의 size 컬럼 이름 변경
     df1_filtered = product_df.rename(columns={'size': 'product_size'})
