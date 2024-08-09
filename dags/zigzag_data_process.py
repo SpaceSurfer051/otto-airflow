@@ -30,7 +30,7 @@ dag = DAG(
 
 
 def fetch_data_from_redshift(**kwargs):
-    redshift_hook = PostgresHook(postgres_conn_id="red_conn")
+    redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
     conn = redshift_hook.get_conn()
     sql_product = """
         SELECT product_name, size, category, platform, brand
