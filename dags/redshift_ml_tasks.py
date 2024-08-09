@@ -44,6 +44,7 @@ def process_data(products_df, reviews_df):
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
                 logging.info("fit")
+                logging.info(size_list[index])
                 return size_list[index]
         except ValueError:
             return row["size"]
@@ -56,7 +57,6 @@ def process_data(products_df, reviews_df):
         ]
         if not product_sizes.empty:
             size_list = ast.literal_eval(product_sizes.iloc[0])
-            logging.info("3 : {}".format(size_list))
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:
