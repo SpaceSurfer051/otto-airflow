@@ -70,15 +70,7 @@ def fetch_data_from_redshift():
 '''
 
 
-with dag:
-    
-    unload_data_task = PythonOperator(
-        task_id="unload_data_to_s3",
-        python_callable=unload_data_to_s3,
-        provide_context=False,
-    )
 
-    unload_data_task
 
 
 
@@ -116,3 +108,14 @@ def unload_data_to_s3():
 
     except Exception as e:
         print(f"Error unloading data to S3: {e}")
+        
+        
+with dag:
+    
+    unload_data_task = PythonOperator(
+        task_id="unload_data_to_s3",
+        python_callable=unload_data_to_s3,
+        provide_context=False,
+    )
+
+    unload_data_task
