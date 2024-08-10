@@ -115,7 +115,7 @@ with dag:
     unload_data_task = PythonOperator(
         task_id="unload_data_to_s3",
         python_callable=unload_data_to_s3,
-        provide_context=False,
+        
     )
 
     unload_data_task
