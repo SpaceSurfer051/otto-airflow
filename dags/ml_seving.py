@@ -8,50 +8,6 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import boto3
 import psycopg2
 
-def unload_data_to_s3():
-    # Redshift 연결 정보
-    redshift_conn_params = {
-        'dbname': 'your_database',
-        'user': 'your_user',
-        'password': 'your_password',
-        'host': 'your_redshift_cluster_host',
-        'port': '5439'
-    }
-
-    # S3 정보
-    s3_bucket = 'your-bucket'
-    s3_prefix = 'your-folder/'
-    iam_role = 'arn:aws:iam::your-account-id:role/your-redshift-role'
-
-    # UNLOAD SQL 쿼리
-    unload_query = f"""
-    UNLOAD ('SELECT * FROM your_table')
-    TO 's3://{s3_bucket}/{s3_prefix}'
-    IAM_ROLE '{iam_role}'
-    DELIMITER ','
-    ADDQUOTES
-    ALLOWOVERWRITE
-    PARALLEL OFF;
-    """
-
-    try:
-        # Redshift에 연결
-        conn = psycopg2.connect(**redshift_conn_params)
-        cursor = conn.cursor()
-
-        # UNLOAD 쿼리 실행
-        cursor.execute(unload_query)
-        conn.commit()
-
-        print("Data unloaded to S3 successfully.")
-
-    except Exception as e:
-        print(f"Error unloading data to S3: {e}")
-
-    finally:
-        # 연결 종료
-        cursor.close()
-        conn.close()
 
 default_args = {
     "owner": "SB    ",
