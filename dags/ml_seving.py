@@ -83,7 +83,7 @@ def unload_data_to_s3():
 
     # S3 정보
     s3_bucket = 'otto-ml-1'
-    s3_prefix = 'ml_table'
+    s3_prefix = 'ml_table.csv'
     iam_role = 'arn:aws:iam::862327261051:role/service-role/AmazonRedshift-CommandsAccessRole-20240726T150655'
 
     # UNLOAD SQL 쿼리
