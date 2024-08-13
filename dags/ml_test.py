@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.hooks.postgres_hook import PostgresHook
 from datetime import datetime
+from airflow.utils.dates import days_ago
 
 # UNLOAD 쿼리를 생성하는 함수
 def generate_unload_query(**kwargs):
@@ -43,7 +44,7 @@ def execute_unload(**kwargs):
 # DAG 설정
 default_args = {
     'owner': 'airflow',
-    'start_date': datetime(2023, 1, 1),
+    'start_date': days_ago(1),
     'retries': 1,
 }
 
