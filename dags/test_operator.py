@@ -108,12 +108,9 @@ class CrawlingOperator(BaseOperator):
             time.sleep(2)
             
             for x in range(1, 46):
-                try:
-                    xpath = f'//*[@id="root"]/main/div/section[3]/div[1]/div/div[{x}]/div/div[2]/a[2]'                    
+                try:               
                     element = driver.find_element(By.XPATH, f'//*[@id="root"]/main/div/section[3]/div[1]/div/div[{x}]/div/div[2]/a[2]').text
-                    
-                    href = element.get_attribute('href')
-                    href_links.add(href)
+                    href_links.add(element)
                 except (NoSuchElementException, TimeoutException):
                     continue
 
