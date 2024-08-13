@@ -12,17 +12,17 @@ default_args = {
 with DAG(
     's3_list_dag_v1',
     default_args=default_args,
-    description='DAG for listing files in S3 using a custom operator',
+    description='DAG for listing files in S3 using a custom operator_v1',
     schedule_interval='@daily',
     catchup=False,
 ) as dag:
 
-    # S3 버킷의 파일 목록을 가져오는 작업
+    # S3 버킷의 마지막 파일 목록을 가져오는 작업
     list_s3_files = S3ListOperator(
         task_id='list_s3_files',
         aws_conn_id='aws_default',
         bucket_name='otto-glue',
-        s3_root='integrated-data/products/'
+        s3_root='integrated-data/products/',
     )
 
     list_s3_files
