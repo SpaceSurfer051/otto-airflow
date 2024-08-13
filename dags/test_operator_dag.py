@@ -1,6 +1,6 @@
 from airflow import DAG
 from datetime import datetime
-from test_operator import S3ListOperator
+from test_operator import S3ListOperator,crawlingOperator
 
 default_args = {
     'owner': 'airflow',
@@ -12,7 +12,7 @@ default_args = {
 with DAG(
     's3_list_dag_v1',
     default_args=default_args,
-    description='DAG for listing files in S3 using a custom operator_v1',
+    description='DAG for listing files in S3 using a custom operator_v2',
     schedule_interval='@daily',
     catchup=False,
 ) as dag:
@@ -25,4 +25,13 @@ with DAG(
         s3_root='integrated-data/products/',
     )
 
-    list_s3_files
+    test_crawling_files = crawlingOperator(
+        task_id = 'crawling_test',
+        aws_conn_id='aws_default',
+        bucket_name='otto-glue',
+        reviews_s3_root = 'integrated-data/reviews/',
+        products_s3_root='integrated-data/products/',
+        
+    )
+    
+    list_s3_files >> test_crawling_files
