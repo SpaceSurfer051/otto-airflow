@@ -12,7 +12,7 @@ default_args = {
 with DAG(
     's3_list_dag_v1',
     default_args=default_args,
-    description='DAG for listing files in S3 using a custom operator_v2',
+    description='DAG for listing files in S3 using a custom operator_v3',
     schedule_interval='@daily', 
     catchup=False,
 ) as dag:
@@ -25,7 +25,7 @@ with DAG(
         s3_root='integrated-data/products/',
     )
 
-    test_crawling_files = crawlingOperator(
+    test_crawling_files = CrawlingOperator(
         task_id = 'crawling_test',
         aws_conn_id='aws_default',
         bucket_name='otto-glue',
