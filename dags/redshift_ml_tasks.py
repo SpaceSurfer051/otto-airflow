@@ -1,6 +1,6 @@
 import pandas as pd
-import logging
 import ast
+import json
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -31,19 +31,15 @@ def process_data(products_df, reviews_df):
     def recommend_size(row, size_list):
         try:
             index = size_list.index(row["size"])
-            logging.info(index)
-            if row["size_comment"] == -1:
-                logging.info("small")
+            if row["size_comment"] == "-1":
                 return (
                     size_list[index + 1]
                     if index + 1 < len(size_list)
                     else size_list[index]
                 )
-            elif row["size_comment"] == 1:
-                logging.info("big")
+            elif row["size_comment"] == "1":
                 return size_list[index - 1] if index > 0 else size_list[index]
             else:
-                logging.info("fit")
                 return size_list[index]
         except ValueError:
             return row["size"]
@@ -55,8 +51,8 @@ def process_data(products_df, reviews_df):
             products_df["product_name"] == review["product_name"], "size"
         ]
         if not product_sizes.empty:
-            size_list = ast.literal_eval(product_sizes)
-            logging.info("3 : {}".format(size_list))
+            size_list = ast.literal_eval(product_sizes.values[0])
+            size_list = json.loads(size_list)
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:

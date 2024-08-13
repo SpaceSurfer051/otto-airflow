@@ -39,6 +39,7 @@ def fetch_data_from_redshift(**kwargs):
 
 
 def process_data(**kwargs):
+    
     # product_size를 리스트로 변환하고 조건에 맞게 처리하는 함수
     def preprocess_product_size(product_size):
         try:
@@ -65,6 +66,21 @@ def process_data(**kwargs):
     # 괄호로 시작해서 괄호로 끝나는 텍스트를 제거하는 함수
     def remove_parentheses(text):
         return re.sub(r'\([^)]*\)', '', text)
+
+    # 빈 문자열을 제거하는 함수
+    def remove_empty_strings(size_list_str):
+        try:
+            # 문자열을 리스트로 변환
+            size_list = ast.literal_eval(size_list_str)
+            
+            # 빈 문자열을 제거
+            filtered_list = [size for size in size_list if size.strip() != '']
+            
+            # 리스트를 다시 문자열로 변환
+            return str(filtered_list)
+        except:
+            # 변환 중 오류가 발생하면 원래 문자열을 반환
+            return size_list_str
 
     def clean_review_size(review_size):
         # 소문자로 변환
@@ -133,7 +149,7 @@ def process_data(**kwargs):
         gender = row['gender']
         size_comment = row['size_comment']
         
-        valid_sizes_2 = extract_valid_sizes(product_size)
+        valid_sizes_2 = product_size
         size_index = valid_sizes_2.index(review_size) if review_size in valid_sizes_2 else -1
         
         if gender == '남성':
@@ -169,7 +185,7 @@ def process_data(**kwargs):
         product_size = row['product_size']
         review_size = row['review_size']
         
-        valid_sizes_2 = extract_valid_sizes(product_size)
+        valid_sizes_2 = product_size
         
         if review_size.lower() in valid_sizes_2:
             index = valid_sizes_2.index(review_size.lower())
@@ -188,10 +204,10 @@ def process_data(**kwargs):
     product_df = pd.read_json(product_df_json)
     reviews_df = pd.read_json(reviews_df_json)
 
+# culonculon 
+
     valid_sizes = ['WS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', 'F', 'Free']
     default_sizes = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL']
-
-# culonculon 
 
     # df1_filtered의 size 컬럼 이름 변경
     df1_filtered = product_df.rename(columns={'size': 'product_size'})
@@ -266,69 +282,67 @@ def save_data_to_redshift(**kwargs):
     processed_product_df = pd.read_json(processed_product_df_json)
     processed_reviews_df = pd.read_json(processed_reviews_df_json)
 
-    print(processed_product_df)
-    print(processed_reviews_df)
-    # # Ensure tables exist and use schema and table names as specified
-    # cursor.execute(
-    #     """
-    #     DROP TABLE IF EXISTS otto."29cm_product" CASCADE;
-    #     CREATE TABLE IF NOT EXISTS otto."29cm_product" (
-    #         product_name TEXT,
-    #         size TEXT,
-    #         category TEXT,
-    #         platform TEXT,
-    #         brand TEXT
-    #     );
-    #     """
-    # )
+    # Ensure tables exist and use schema and table names as specified
+    cursor.execute(
+        """
+        DROP TABLE IF EXISTS otto."musinsa_product" CASCADE;
+        CREATE TABLE IF NOT EXISTS otto."musinsa_product" (
+            product_name TEXT,
+            size TEXT,
+            category TEXT,
+            platform TEXT,
+            brand TEXT
+        );
+        """
+    )
 
-    # cursor.execute(
-    #     """
-    #     DROP TABLE IF EXISTS otto."29cm_reviews" CASCADE;
-    #     CREATE TABLE IF NOT EXISTS otto."29cm_reviews" (
-    #         product_name TEXT,
-    #         size TEXT,
-    #         height NUMERIC,
-    #         weight NUMERIC,
-    #         gender TEXT,
-    #         size_comment TEXT
-    #     );
-    #     """
-    # )
+    cursor.execute(
+        """
+        DROP TABLE IF EXISTS otto."musinsa_reviews" CASCADE;
+        CREATE TABLE IF NOT EXISTS otto."musinsa_reviews" (
+            product_name TEXT,
+            size TEXT,
+            height NUMERIC,
+            weight NUMERIC,
+            gender TEXT,
+            size_comment TEXT
+        );
+        """
+    )
 
-    # # Insert data into 29cm_product table
-    # for _, row in processed_product_df.iterrows():
-    #     cursor.execute(
-    #         """
-    #         INSERT INTO otto."29cm_product" (product_name, size, category, platform, brand)
-    #         VALUES (%s, %s, %s, %s, %s)
-    #         """,
-    #         (
-    #             row["product_name"],
-    #             json.dumps(row["size"]),
-    #             row["category"],
-    #             row["platform"],
-    #             row["brand"],
-    #         ),
-    #     )
+    # Insert data into musinsa_product table
+    for _, row in processed_product_df.iterrows():
+        cursor.execute(
+            """
+            INSERT INTO otto."musinsa_product" (product_name, size, category, platform, brand)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                row["product_name"],
+                json.dumps(row["size"]),
+                row["category"],
+                row["platform"],
+                row["brand"],
+            ),
+        )
 
-    # # Insert data into 29cm_reviews table
-    # for _, row in processed_reviews_df.iterrows():
-    #     cursor.execute(
-    #         """
-    #         INSERT INTO otto."29cm_reviews" (product_name, size, height, weight, gender, size_comment)
-    #         VALUES (%s, %s, %s, %s, %s, %s)
-    #         """,
-    #         (
-    #             row["product_name"],
-    #             row["size"],
-    #             row["height"],
-    #             row["weight"],
-    #             row["gender"],
-    #             row["size_comment"],
-    #         ),
-    #     )
+    # Insert data into musinsa_reviews table
+    for _, row in processed_reviews_df.iterrows():
+        cursor.execute(
+            """
+            INSERT INTO otto."musinsa_reviews" (product_name, size, height, weight, gender, size_comment)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                row["product_name"],
+                row["size"],
+                row["height"],
+                row["weight"],
+                row["gender"],
+                row["size_comment"],
+            ),
+        )
 
-    # conn.commit()
-    # cursor.close()
-    # conn.close()
+    conn.commit()
+    cursor.close()
+    conn.close()
