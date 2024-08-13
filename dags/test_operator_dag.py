@@ -12,7 +12,7 @@ default_args = {
 with DAG(
     's3_list_dag_v1',
     default_args=default_args,
-    description='DAG for listing files in S3 using a custom operator_v4',
+    description='DAG for listing files in S3 using a custom operator_v5',
     schedule_interval='@daily', 
     catchup=False,
 ) as dag:
