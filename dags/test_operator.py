@@ -23,8 +23,11 @@ class S3ListOperator(BaseOperator):
         files = s3_hook.list_keys(bucket_name=self.bucket_name, prefix=self.s3_root)
         
         if files:
+            for i in range(len(files)):
+                print(f"{i} 번 째 파일 : files[{i}]")
+            
             # 가장 마지막 파일을 선택
-            last_file = files[-1]
-            self.log.info(f"Found files in {self.s3_root}. Last file: {last_file}")
+            #last_file = files[-1]
+            #self.log.info(f"Found files in {self.s3_root}. Last file: {last_file}")
         else:
             self.log.info(f"No files found in {self.s3_root}.")
