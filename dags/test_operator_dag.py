@@ -10,7 +10,7 @@ default_args = {
 }
 
 with DAG(
-    's3_list_dag',
+    's3_list_dag_v1',
     default_args=default_args,
     description='DAG for listing files in S3 using a custom operator',
     schedule_interval='@daily',
@@ -22,6 +22,7 @@ with DAG(
         task_id='list_s3_files',
         aws_conn_id='aws_default',
         bucket_name='otto-glue',
+        s3_root='integrated-data/products/'
     )
 
     list_s3_files
