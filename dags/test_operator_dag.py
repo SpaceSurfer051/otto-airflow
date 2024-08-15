@@ -25,6 +25,8 @@ with DAG(
         s3_root='integrated-data/products/',
     )
 
+    #체크하는 dag 실행하고, 없으면 처음부터 실행
+
     test_crawling_files = CrawlingOperator(
         task_id = 'crawling_test',
         aws_conn_id='aws_default',

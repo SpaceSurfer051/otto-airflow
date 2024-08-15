@@ -120,16 +120,6 @@ class CrawlingOperator(BaseOperator):
 
         href_links = list(href_links)
         print(f"Total href links collected: {len(href_links)}")
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         ################# URL 탐색 파트 끝 #################
         
         
