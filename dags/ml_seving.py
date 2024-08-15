@@ -91,6 +91,7 @@ def unload_data_to_s3():
     UNLOAD ('SELECT * FROM otto.ml_table')
     TO 's3://{s3_bucket}/{s3_prefix}'
     IAM_ROLE '{iam_role}'
+    HEADER 
     DELIMITER ','
     ADDQUOTES
     ALLOWOVERWRITE
