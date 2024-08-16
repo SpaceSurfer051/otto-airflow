@@ -51,18 +51,20 @@ def process_data(products_df, reviews_df):
         product_sizes = products_df.loc[
             products_df["product_name"] == review["product_name"], "size"
         ]
-        if not product_sizes.empty:
-            size_list = ast.literal_eval(product_sizes.values[0])
-            try:
-                size_list = json.loads(size_list)
-            except json.JSONDecodeError as e:
-                logging.info(size_list)
-                print(f"JSON decode error: {e}")
+        if product_sizes.empty:
+            size_recommendations.append(review["size"])
+        else:
+            if isinstance(product_sizes, list):
+                size_list = product_sizes
+            else:
+                size_list = ast.literal_eval(product_sizes.values[0])
+                try:
+                    size_list = json.loads(size_list)
+                except json.JSONDecodeError:
+                    logging.info(size_list)
 
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
-        else:
-            size_recommendations.append(review["size"])
 
     filtered_reviews_df["size_recommend"] = size_recommendations
 
