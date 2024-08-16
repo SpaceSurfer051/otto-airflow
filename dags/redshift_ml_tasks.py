@@ -1,6 +1,7 @@
 import pandas as pd
 import ast
 import json
+import logging
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 
@@ -52,7 +53,12 @@ def process_data(products_df, reviews_df):
         ]
         if not product_sizes.empty:
             size_list = ast.literal_eval(product_sizes.values[0])
-            size_list = json.loads(size_list)
+            try:
+                size_list = json.loads(size_list)
+            except json.JSONDecodeError as e:
+                logging.info(size_list)
+                print(f"JSON decode error: {e}")
+
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
         else:
