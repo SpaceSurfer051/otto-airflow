@@ -7,8 +7,8 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 def fetch_data_from_redshift():
     redshift_hook = PostgresHook(postgres_conn_id="otto_redshift")
-    products_query = """ SELECT * FROM otto."29cm_product" UNION SELECT * FROM otto.musinsa_product UNION SELECT * FROM otto.zigzag_product """
-    reviews_query = """ SELECT * FROM otto."29cm_reviews" UNION SELECT * FROM otto.musinsa_reviews UNION SELECT * FROM otto.zigzag_reviews """
+    products_query = """ SELECT * FROM otto."29cm_product" UNION ALL SELECT * FROM otto.musinsa_product UNION ALL SELECT * FROM otto.zigzag_product """
+    reviews_query = """ SELECT * FROM otto."29cm_reviews" UNION ALL SELECT * FROM otto.musinsa_reviews UNION ALL SELECT * FROM otto.zigzag_reviews """
 
     connection = redshift_hook.get_conn()
     products_df = pd.read_sql(products_query, connection)
