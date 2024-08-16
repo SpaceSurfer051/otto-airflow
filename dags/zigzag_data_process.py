@@ -88,7 +88,7 @@ def process(**kwargs):
     p_df['size'] = p_df['size'].apply(replace_f_with_sizes)
     p_df['size'] = p_df['size'].apply(remove_quotes)
     p_df['size'] = p_df['size'].apply(delete_space)
-    p_df['size'] = p_df['size'].apply(split_column_to_list)
+    p_df['size'] = p_df['size'].apply(format_string_with_brackets)
     
     
 
@@ -561,6 +561,9 @@ def delete_space(text):
         text = np.nan
     return text
 
-def split_column_to_list(df, column_name):
-    df[column_name] = df[column_name].apply(lambda x: x.split(','))
-    return df
+def format_string_with_brackets(s):
+    if isinstance(s, str):
+        # 앞의 쉼표를 제거한 후 대괄호를 추가
+        s = s.lstrip(',')
+        return f"[{s}]"
+    return s
