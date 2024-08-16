@@ -51,17 +51,23 @@ def process_data(products_df, reviews_df):
         product_sizes = products_df.loc[
             products_df["product_name"] == review["product_name"], "size"
         ]
+
         if product_sizes.empty:
             size_recommendations.append(review["size"])
         else:
-            if isinstance(product_sizes, list):
-                size_list = product_sizes
-            else:
-                size_list = ast.literal_eval(product_sizes.values[0])
+            size_list = product_sizes.values[0]
+            if isinstance(size_list, list):
+                # 이미 리스트인 경우 그대로 사용
+                pass
+            elif isinstance(size_list, str):
                 try:
-                    size_list = json.loads(size_list)
-                except json.JSONDecodeError:
-                    logging.info(size_list)
+                    # 문자열로 저장된 리스트를 파싱
+                    size_list = ast.literal_eval(size_list)
+                    if isinstance(size_list, str):
+                        size_list = json.loads(size_list)
+                except (ValueError, SyntaxError, json.JSONDecodeError):
+                    logging.info(f"Failed to parse size_list: {size_list}")
+                    size_list = [review["size"]]
 
             recommended_size = recommend_size(review, size_list)
             size_recommendations.append(recommended_size)
