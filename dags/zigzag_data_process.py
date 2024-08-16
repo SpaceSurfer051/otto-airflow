@@ -88,6 +88,9 @@ def process(**kwargs):
     p_df['size'] = p_df['size'].apply(replace_f_with_sizes)
     p_df['size'] = p_df['size'].apply(remove_quotes)
     p_df['size'] = p_df['size'].apply(delete_space)
+    p_df['size'] = p_df['size'].apply(split_column_to_list)
+    
+    
 
     #review logic
     r_df['size'] = r_df['size'].apply(remove_korean)
@@ -557,3 +560,7 @@ def delete_space(text):
     if text  == '':
         text = np.nan
     return text
+
+def split_column_to_list(df, column_name):
+    df[column_name] = df[column_name].apply(lambda x: x.split(','))
+    return df
