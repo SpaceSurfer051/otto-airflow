@@ -70,7 +70,7 @@ def read_s3_to_dataframe(bucket_name, key):
     s3_object = s3_hook.get_key(key, bucket_name)
     s3_data = s3_object.get()['Body'].read().decode('utf-8')
     data = pd.read_csv(io.StringIO(s3_data))
-    # 데이터 길이 로그 기록
+    # 데이터 길이 로그 기록     
     logging.info(f"Read {len(data)} rows from {key}")
     return data
 

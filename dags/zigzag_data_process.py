@@ -114,7 +114,12 @@ def process(**kwargs):
     r_df['size'] = r_df.apply(fill_missing_size, axis=1, unique_sizes=unique_sizes)
 
     r_df['gender'] = r_df['gender'].apply(gender_gen)
-
+    
+    
+    r_df["height"] = r_df.apply(lambda x : logging.info("before height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
+    r_df["weight"] = r_df.apply(lambda x : logging.info("before weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    
+    
     r_df["height"] = r_df.apply(
         lambda row: generate_random_value(row["size"], row["gender"], "height") 
         if pd.isna(row["height"]) or row["height"] == '' else row["height"], 
@@ -126,18 +131,29 @@ def process(**kwargs):
         if pd.isna(row["weight"]) or row["weight"] == '' else row["weight"], 
         axis=1
         )
-
+    
+    
+    #r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["eight"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    null_values_height = r_df[r_df['height'].isnull()]
+    null_values_weight = r_df[r_df['weight'].isnull()]
+    logging.info("Null values in height column:\n{}".format(null_values_height))
+    logging.info("Null values in weight column:\n{}".format(null_values_weight))
+    
     r_df['weight'] = r_df['weight'].replace(to_replace=r'kg', value='', regex=True)
     r_df['height'] = r_df['height'].replace(to_replace=r'cm', value='', regex=True)
 
     r_df['size_comment'] = r_df['size_comment'].apply(size_change)
     r_df['height'] = pd.to_numeric(r_df['height'], errors='coerce')
     r_df['weight'] = pd.to_numeric(r_df['weight'], errors='coerce')
-    r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x)) if not isinstance(x, int) else x,axis=1 ) 
-    r_df["height"] = r_df.apply(lambda x : logging.info("weight : {}".format(x)) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["height"] = r_df.apply(lambda x : logging.info("height : {}".format(x['height'])) if not isinstance(x, int) else x,axis=1 ) 
+    #r_df["height"] = r_df.apply(lambda x : logging.info("weight : {}".format(x['weight'])) if not isinstance(x, int) else x,axis=1 ) 
+    null_values_height = r_df[r_df['height'].isnull()]
+    null_values_weight = r_df[r_df['weight'].isnull()]
+    logging.info("re values in height column:\n{}".format(null_values_height))
+    logging.info("re values in weight column:\n{}".format(null_values_weight))
     
-    logging.info(r_df['height'])
-    r_df['weight']
+    
     processed_product_df = p_df[
         ["product_name", "size", "category", "platform", "brand"]
     ]
@@ -481,11 +497,6 @@ def generate_random_value(size, gender, attribute):
     else:
         min_val, max_val = size_ranges["F"][gender][attribute]
     return round(random.uniform(min_val, max_val))
-
-def fill_missing_values(row, attribute):
-    if pd.isna(row['height']) or row['height'] or pd.isna(row['weight']) or row['weight'] == '':
-        row['size'] = generate_random_value('F', row['gender'], attribute)
-    return row
 
 def size_change(text):
     if pd.isna(text):
